@@ -5,6 +5,8 @@ import { DAY_MS, startOfDay, dateKey } from '../lib/date';
 import { dailyAnswer, dailyPool, isCorrectGuess, cluesFor, DAILY_ATTEMPTS } from '../lib/daily';
 import { buildQuiz, chooseBlank, blankedText } from '../lib/quiz';
 import { BY_ID, CORE, LEARNABLE } from '../lib/data';
+import { UNITS, LESSONS, nodeStates, currentLesson, PASS_RATIO } from '../lib/lessons';
+import { buildLessonSteps } from '../lib/quiz';
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data = { ...initial };
@@ -189,7 +191,7 @@ describe('daily challenge', () => {
 describe('quiz builders', () => {
   const ctx = { byId: BY_ID, pool: CORE };
 
-  for (const mode of ['emoji', 'kosong', 'konteks'] as const) {
+  for (const mode of ['maksud', 'emoji', 'kosong', 'konteks'] as const) {
     it(`builds a valid ${mode} session`, () => {
       const qs = buildQuiz(mode, ctx, `test-${mode}`);
       expect(qs.length).toBeGreaterThanOrEqual(6);
@@ -214,5 +216,57 @@ describe('quiz builders', () => {
 
   it('is reproducible for the same session id', () => {
     expect(buildQuiz('kosong', ctx, 'abc').map((q) => q.key)).toEqual(buildQuiz('kosong', ctx, 'abc').map((q) => q.key));
+  });
+});
+
+describe('learning path', () => {
+  const ctx = { byId: BY_ID, pool: CORE };
+
+  it('builds units of short lessons with every saying used once and learnable', () => {
+    expect(UNITS.length).toBeGreaterThanOrEqual(6);
+    const seen = new Set<string>();
+    for (const l of LESSONS) {
+      expect(l.sayings.length).toBeGreaterThanOrEqual(2);
+      expect(l.sayings.length).toBeLessThanOrEqual(4);
+      for (const r of l.sayings) {
+        expect(seen.has(r.id), r.id).toBe(false);
+        seen.add(r.id);
+        expect(LEARNABLE).toContain(r);
+      }
+    }
+  });
+
+  it('unlocks lessons in order', () => {
+    const states = nodeStates({});
+    expect(states.get(LESSONS[0].id)).toBe('current');
+    expect(states.get(LESSONS[1].id)).toBe('locked');
+    const after = nodeStates({ [LESSONS[0].id]: true });
+    expect(after.get(LESSONS[0].id)).toBe('done');
+    expect(after.get(LESSONS[1].id)).toBe('current');
+    expect(currentLesson({ [LESSONS[0].id]: true })?.id).toBe(LESSONS[1].id);
+  });
+
+  it('teaches every saying first, then practises only those sayings', () => {
+    const lesson = LESSONS[0];
+    const steps = buildLessonSteps(lesson.sayings, ctx, 'run-1');
+    const ids = new Set(lesson.sayings.map((r) => r.id));
+    expect(steps.slice(0, lesson.sayings.length).every((s) => s.kind === 'teach')).toBe(true);
+    expect(steps.some((s) => s.kind === 'match')).toBe(true);
+    for (const s of steps) if (s.kind === 'question') {
+      expect(ids.has(s.q.recordId)).toBe(true);
+      expect(new Set(s.q.options.map((o) => o.label)).size).toBe(s.q.options.length);
+    }
+  });
+
+  it('records a passed lesson once and pays its bonus once', () => {
+    const store = createStore(memoryStorage(), () => NOW);
+    const l = LESSONS[0];
+    const fail = store.completeLesson({ runId: 'a', lessonId: l.id, title: l.title, correct: 2, total: 8, passRatio: PASS_RATIO });
+    expect(fail.passed).toBe(false);
+    expect(store.getState().lessonsDone[l.id]).toBeUndefined();
+    const pass = store.completeLesson({ runId: 'b', lessonId: l.id, title: l.title, correct: 7, total: 8, passRatio: PASS_RATIO });
+    expect(pass).toEqual({ passed: true, gained: XP.lessonComplete });
+    expect(store.completeLesson({ runId: 'c', lessonId: l.id, title: l.title, correct: 8, total: 8, passRatio: PASS_RATIO }).gained).toBe(0);
+    expect(store.getState().achievements['mula-melangkah']).toBe(NOW);
   });
 });

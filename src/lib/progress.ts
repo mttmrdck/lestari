@@ -62,6 +62,10 @@ export interface ProgressState {
   counters: { situationSearches: number; emojiCorrect: number; contextCorrect: number; quizzesCompleted: number; reviews: number; dailySolved: number };
   situationQueries: string[];
   activity: ActivityItem[];
+  /** Best passing result per learning-path lesson. */
+  lessonsDone: Record<string, { correct: number; total: number; t: number }>;
+  /** Wrong-answer count at the moment a mistake was dismissed from the review list. */
+  clearedMistakes: Record<string, number>;
   settings: { timer: boolean };
 }
 
@@ -83,6 +87,8 @@ export const emptyState = (): ProgressState => ({
   counters: { situationSearches: 0, emojiCorrect: 0, contextCorrect: 0, quizzesCompleted: 0, reviews: 0, dailySolved: 0 },
   situationQueries: [],
   activity: [],
+  lessonsDone: {},
+  clearedMistakes: {},
   settings: { timer: false },
 });
 
@@ -92,6 +98,7 @@ export const XP = {
   quizCorrect: 10,
   contextBonus: 5,
   quizComplete: 10,
+  lessonComplete: 20,
   review: 3,
   explore: 1,
   exploreDailyCap: 20,
@@ -101,7 +108,7 @@ export const XP = {
 
 // ---------- Achievements ----------
 
-export type AchievementId = 'langkah-pertama' | 'pencari-tegar' | 'pakar-emoji' | 'mahir-konteks' | 'konsisten-belajar' | 'pendekar-bahasa' | 'teka-harian' | 'ulang-kaji-rajin';
+export type AchievementId = 'mula-melangkah' | 'langkah-pertama' | 'konsisten' | 'bijak-bahasa' | 'raja-peribahasa' | 'pencari-tegar' | 'pakar-emoji' | 'mahir-konteks' | 'teka-harian' | 'ulang-kaji-rajin';
 
 export interface Achievement {
   id: AchievementId;
@@ -112,12 +119,14 @@ export interface Achievement {
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'mula-melangkah', title: 'Mula Melangkah', rule: 'Lulus pelajaran pertama dalam laluan.', target: 1, value: (s) => Object.keys(s.lessonsDone).length },
   { id: 'langkah-pertama', title: 'Langkah Pertama', rule: 'Selesaikan satu sesi kuiz.', target: 1, value: (s) => s.counters.quizzesCompleted },
+  { id: 'konsisten', title: 'Konsisten!', rule: 'Belajar 7 hari berturut-turut.', target: 7, value: (s) => longestStreak(s.activeDays) },
+  { id: 'bijak-bahasa', title: 'Bijak Bahasa', rule: 'Kuasai 25 peribahasa.', target: 25, value: (s) => masteredIds(s).length },
+  { id: 'raja-peribahasa', title: 'Raja Peribahasa', rule: 'Kuasai 100 peribahasa.', target: 100, value: (s) => masteredIds(s).length },
   { id: 'pencari-tegar', title: 'Pencari Tegar', rule: 'Buat 10 carian situasi yang berbeza.', target: 10, value: (s) => s.counters.situationSearches },
-  { id: 'pakar-emoji', title: 'Pakar Emoji', rule: 'Jawab 15 soalan Teka Emoji dengan betul.', target: 15, value: (s) => s.counters.emojiCorrect },
-  { id: 'mahir-konteks', title: 'Mahir Konteks', rule: 'Jawab 20 soalan Pilih Peribahasa dengan betul.', target: 20, value: (s) => s.counters.contextCorrect },
-  { id: 'konsisten-belajar', title: 'Konsisten Belajar', rule: 'Belajar 7 hari berturut-turut.', target: 7, value: (s) => longestStreak(s.activeDays) },
-  { id: 'pendekar-bahasa', title: 'Pendekar Bahasa', rule: 'Kuasai 25 peribahasa.', target: 25, value: (s) => masteredIds(s).length },
+  { id: 'pakar-emoji', title: 'Pakar Emoji', rule: 'Jawab 15 soalan Kuiz Emoji dengan betul.', target: 15, value: (s) => s.counters.emojiCorrect },
+  { id: 'mahir-konteks', title: 'Mahir Konteks', rule: 'Jawab 20 soalan Padankan Situasi dengan betul.', target: 20, value: (s) => s.counters.contextCorrect },
   { id: 'teka-harian', title: 'Penebak Harian', rule: 'Selesaikan 5 cabaran Peribahasa Hari Ini.', target: 5, value: (s) => s.counters.dailySolved },
   { id: 'ulang-kaji-rajin', title: 'Ulang Kaji Rajin', rule: 'Buat 50 ulang kaji kad imbas.', target: 50, value: (s) => s.counters.reviews },
 ];
@@ -160,6 +169,12 @@ export function longestStreak(days: DateKey[]): number {
     prev = d;
   }
   return best;
+}
+
+/** Sayings to revise: latest answer wrong (and not dismissed since), or saved for revision after a quiz. */
+export function mistakeIds(s: ProgressState): string[] {
+  const wrong = Object.entries(s.answers).filter(([id, a]) => !a.lastCorrect && a.wrong > (s.clearedMistakes[id] ?? 0)).map(([id]) => id);
+  return [...new Set([...wrong, ...s.revisionList])];
 }
 
 export function quizAccuracy(s: ProgressState): number | null {
@@ -206,6 +221,8 @@ function sanitize(input: unknown): ProgressState {
     counters: { ...base.counters, ...obj(s.counters, {}) },
     situationQueries: arr<string>(s.situationQueries, []),
     activity: arr(s.activity, []),
+    lessonsDone: obj(s.lessonsDone, {}),
+    clearedMistakes: obj(s.clearedMistakes, {}),
     settings: { ...base.settings, ...obj(s.settings, {}) },
   };
 }
@@ -324,6 +341,16 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
       commit({ ...state, revisionList: [...set] });
     },
 
+    /** Mark a past mistake as reviewed: drops it from the revision list and clears the wrong flag. */
+    clearMistake(id: string) {
+      // Mastery evidence is untouched; we only remember how many wrong answers had been seen.
+      commit({
+        ...state,
+        revisionList: state.revisionList.filter((x) => x !== id),
+        clearedMistakes: { ...state.clearedMistakes, [id]: state.answers[id]?.wrong ?? 0 },
+      });
+    },
+
     logSituationSearch(query: string) {
       const q = query.trim().toLowerCase();
       if (!q || state.situationQueries.includes(q)) return;
@@ -399,6 +426,23 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
       return card;
     },
 
+    /** Finish a learning-path lesson. Passing (60%+) records it; the bonus is paid once per lesson. */
+    completeLesson(args: { runId: string; lessonId: string; title: string; correct: number; total: number; passRatio: number }) {
+      const { runId, lessonId, title, correct, total, passRatio } = args;
+      if (state.awarded[`lessonrun:${runId}`]) return { passed: false, gained: 0 };
+      const passed = total > 0 && correct / total >= passRatio;
+      let s: ProgressState = markActive({ ...state, awarded: { ...state.awarded, [`lessonrun:${runId}`]: 1 } });
+      let gained = 0;
+      if (passed) {
+        const prev = s.lessonsDone[lessonId];
+        s = { ...s, lessonsDone: { ...s.lessonsDone, [lessonId]: prev && prev.correct / prev.total >= correct / total ? prev : { correct, total, t: now() } } };
+        [s, gained] = award(s, `lesson:${lessonId}`, XP.lessonComplete, 'Pelajaran selesai');
+      }
+      s = { ...s, activity: pushActivity(s.activity, { t: now(), kind: 'quiz', text: passed ? `Lulus pelajaran “${title}” (${correct}/${total})` : `Mencuba pelajaran “${title}” (${correct}/${total})` }) };
+      commit(s);
+      return { passed, gained };
+    },
+
     dailyGuess(day: DateKey, answerId: string, guess: string, correct: boolean, maxAttempts: number) {
       const cur = state.daily[day] ?? { answerId, guesses: [], status: 'playing' as const, xp: 0 };
       if (cur.status !== 'playing') return cur;
@@ -428,7 +472,7 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
 
 export type ProgressStore = ReturnType<typeof createStore>;
 
-export const MODE_LABEL: Record<QuizMode, string> = { emoji: 'Teka Emoji', kosong: 'Isi Tempat Kosong', konteks: 'Pilih Peribahasa', maksud: 'Semak Maksud' };
+export const MODE_LABEL: Record<QuizMode, string> = { emoji: 'Kuiz Emoji', kosong: 'Lengkapkan Peribahasa', konteks: 'Padankan Situasi', maksud: 'Teka Maksud' };
 
 function pushActivity(list: ActivityItem[], item: ActivityItem): ActivityItem[] {
   return [item, ...list].slice(0, 40);

@@ -2,7 +2,10 @@
 //   node scripts/e2e.mjs [baseUrl] [shotsDir]
 // Set CHROME_PATH to use a specific browser; otherwise common macOS paths are tried.
 import { chromium } from 'playwright-core';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+
+const DATA = JSON.parse(readFileSync(new URL('../src/data/peribahasa.json', import.meta.url), 'utf8'));
+const norm = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
 
 const BASE = process.argv[2] ?? 'http://localhost:4173';
 const SHOTS = process.argv[3] ?? 'e2e-shots';
@@ -46,8 +49,56 @@ const settle = (page) => page.waitForTimeout(900);
   await page.getByRole('radio', { name: 'Biasa' }).click();
   await page.locator('dialog').getByRole('button', { name: 'Mula Belajar' }).click();
   await settle(page);
-  check('onboarding lands on home', await page.getByRole('heading', { name: /Aina/ }).isVisible());
-  check('fresh home shows zero XP honestly', (await page.locator('text=Jumlah XP').locator('..').innerText()).includes('0'));
+  check('onboarding lands on the dashboard', await page.getByText(/Aina!/).first().isVisible() && await page.getByRole('link', { name: /Jom Belajar/ }).isVisible());
+  check('fresh dashboard shows zero XP honestly', (await page.getByRole('link', { name: '0 XP keseluruhan' }).first().count()) > 0);
+  check('learning path shows a current and locked lessons', (await page.getByRole('link', { name: /pelajaran semasa/ }).count()) === 1 && (await page.getByRole('img', { name: /dikunci/ }).count()) >= 1);
+  await page.screenshot({ path: `${SHOTS}/flow-02-dashboard.png`, fullPage: true });
+
+  // Pass the first lesson, answering from the real data.
+  await page.getByRole('link', { name: /Jom Belajar/ }).click();
+  await settle(page);
+  const sayings = [];
+  while (await page.getByRole('button', { name: /Faham, teruskan/ }).isVisible().catch(() => false)) {
+    sayings.push(norm(await page.locator('article h1').innerText()));
+    await page.getByRole('button', { name: /Faham, teruskan/ }).click();
+    await page.waitForTimeout(200);
+  }
+  const recs = sayings.map((t) => DATA.find((r) => r.normalizedText === t));
+  check('lesson teaches four real sayings first', recs.length === 4 && recs.every(Boolean), String(recs.length));
+  for (let step = 0; step < 14; step++) {
+    if (await page.getByText('Padankan peribahasa dengan maksudnya').isVisible().catch(() => false)) {
+      for (const r of recs) {
+        await page.locator('ul[aria-label="Peribahasa"] button', { hasText: r.peribahasa }).click();
+        await page.locator('ul[aria-label="Maksud"] button', { hasText: r.maksud }).click();
+        await page.waitForTimeout(80);
+      }
+      await page.getByRole('button', { name: 'Teruskan', exact: true }).click();
+      await page.waitForTimeout(250);
+      continue;
+    }
+    const opts = page.locator('ol[aria-label="Pilihan jawapan"] button');
+    if (!(await opts.count())) break;
+    const prompt = norm(await page.locator('.saying').first().innerText().catch(() => ''));
+    const labels = (await opts.allInnerTexts()).map((t) => t.replace(/^\d+\s*/, '').trim());
+    let pick = labels.findIndex((l) => recs.some((r) => norm(r.peribahasa) === norm(l) || norm(r.maksud) === norm(l)));
+    if (pick < 0) pick = labels.findIndex((l) => recs.some((r) => norm(prompt.replace('?', l)) === r.normalizedText));
+    await opts.nth(Math.max(0, pick)).click();
+    await page.getByRole('button', { name: 'Semak', exact: true }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Teruskan', exact: true }).click();
+    await page.waitForTimeout(250);
+  }
+  await page.waitForTimeout(1300);
+  check('passing a lesson shows the celebration', await page.getByRole('heading', { name: 'Pelajaran selesai!' }).isVisible());
+  await page.screenshot({ path: `${SHOTS}/flow-02b-lesson-results.png`, fullPage: true });
+  const afterLesson = await page.evaluate(() => JSON.parse(localStorage.getItem('lestari:v1')));
+  check('lesson recorded with its bonus and badge', Object.keys(afterLesson.lessonsDone).length === 1 && !!afterLesson.achievements['mula-melangkah'] && afterLesson.awarded['lesson:asas-1'] === 1);
+  await page.getByRole('button', { name: 'Kembali ke Laluan' }).click();
+  await settle(page);
+  check('next lesson unlocked on the path', (await page.getByRole('link', { name: /selesai/ }).count()) >= 1 && (await page.getByRole('link', { name: /pelajaran semasa/ }).count()) === 1);
+  await page.reload();
+  await settle(page);
+  check('lesson progress survives refresh', (await page.getByRole('link', { name: /selesai/ }).count()) >= 1);
   await page.screenshot({ path: `${SHOTS}/flow-02-home-fresh.png`, fullPage: true });
 
   // Keyword search
@@ -158,6 +209,28 @@ const settle = (page) => page.waitForTimeout(900);
   check('daily progress survives refresh', await page.getByText('2. Kategori').isVisible());
   await page.screenshot({ path: `${SHOTS}/flow-10-daily.png`, fullPage: true });
 
+  // Teka Maksud and the saved collection
+  await page.goto(BASE + '/kuiz/maksud');
+  await settle(page);
+  check('Teka Maksud asks for a meaning', await page.getByText('Apakah maksud peribahasa ini?').isVisible());
+  await page.goto(BASE + '/simpanan');
+  await settle(page);
+  check('saved collection lists the bookmark', await page.locator('a[href="/peribahasa/harapkan-pagar-pagar-makan-padi"]').isVisible());
+  await page.getByLabel('Cari dalam senarai').fill('tiada-padanan-zz');
+  check('saved search filters with an empty state', await page.getByText('Tiada padanan dalam senarai ini').isVisible());
+  await page.getByLabel('Cari dalam senarai').fill('');
+  await page.getByRole('link', { name: /Kad imbas senarai ini/ }).click();
+  await settle(page);
+  check('flashcards launch from saved items', await page.getByRole('button', { name: 'Tunjuk maksud' }).isVisible());
+  await page.goto(BASE + '/simpanan');
+  await page.getByRole('radio', { name: /Kesilapan/ }).click();
+  check('mistakes tab lists wrong answers', (await page.locator('a[href^="/peribahasa/"]').count()) > 0);
+  const navBefore = await page.locator('nav[aria-label="Navigasi utama"] li[aria-hidden]').last().getAttribute('style');
+  await page.getByRole('navigation', { name: 'Navigasi utama' }).last().getByRole('link', { name: 'Latihan' }).click();
+  await page.waitForTimeout(400);
+  const navAfter = await page.locator('nav[aria-label="Navigasi utama"] li[aria-hidden]').last().getAttribute('style');
+  check('bottom nav indicator moves with the route', navBefore !== navAfter, `${navBefore} -> ${navAfter}`);
+
   // Profile
   await page.goto(BASE + '/profil');
   await settle(page);
@@ -178,8 +251,21 @@ const settle = (page) => page.waitForTimeout(900);
   await ctx.close();
 }
 
+// ---------- Reduced motion ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  const page = await ctx.newPage();
+  await page.goto(BASE + '/');
+  await page.evaluate(() => localStorage.setItem('lestari:v1', JSON.stringify({ version: 1, profile: { name: 'Aina', level: 'menengah', dailyGoal: 50, createdAt: 1 } })));
+  await page.goto(BASE + '/');
+  await settle(page);
+  const dur = await page.locator('.float').first().evaluate((el) => getComputedStyle(el).animationDuration);
+  check('reduced motion stops idle animation', dur === '0.001s' || dur === '1ms', dur);
+  await ctx.close();
+}
+
 // ---------- 2. Layout at four widths ----------
-const ROUTES = ['/', '/cari', '/cari?mode=kata&q=ayam', '/cari?mode=situasi&q=Semua%20ahli%20kelas%20bergotong-royong%20membersihkan%20kelas%20bersama-sama.', '/peribahasa/sudah-terantuk-baru-tengadah', '/kuiz', '/kuiz/emoji', '/kad-imbas', '/profil', '/harian', '/tentang'];
+const ROUTES = ['/', '/laluan', '/simpanan', '/pelajaran/asas-1', '/cari', '/cari?mode=kata&q=ayam', '/cari?mode=situasi&q=Semua%20ahli%20kelas%20bergotong-royong%20membersihkan%20kelas%20bersama-sama.', '/peribahasa/sudah-terantuk-baru-tengadah', '/kuiz', '/kuiz/emoji', '/kad-imbas', '/profil', '/harian', '/tentang'];
 for (const vp of [{ width: 375, height: 812 }, { width: 430, height: 932 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
   const { ctx, page } = await newPage(vp);
   // Seed a profile so routes render the app shell; welcome is captured separately.

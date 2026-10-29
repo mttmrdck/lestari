@@ -19,6 +19,9 @@ const FlashcardsPage = lazy(() => import('./features/flashcards/FlashcardsPage')
 const ProfilePage = lazy(() => import('./features/progress/ProfilePage'));
 const DailyPage = lazy(() => import('./features/daily-challenge/DailyPage'));
 const AboutPage = lazy(() => import('./features/misc/AboutPage'));
+const LessonPage = lazy(() => import('./features/lesson/LessonPage'));
+const PathPage = lazy(() => import('./features/path/PathPage'));
+const SavedPage = lazy(() => import('./features/favourites/SavedPage'));
 const NotFound = lazy(() => import('./features/misc/NotFound'));
 
 const router = createBrowserRouter([
@@ -36,6 +39,9 @@ const router = createBrowserRouter([
       { path: 'profil', element: <ProfilePage /> },
       { path: 'harian', element: <DailyPage /> },
       { path: 'tentang', element: <AboutPage /> },
+      { path: 'pelajaran/:id', element: <LessonPage /> },
+      { path: 'laluan', element: <PathPage /> },
+      { path: 'simpanan', element: <SavedPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

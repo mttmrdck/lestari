@@ -4,6 +4,7 @@ All 17 repositories were verified to exist (GitHub API, 29 Oct 2026), shallow-cl
 
 | Resource | Status | How it shaped LESTARI |
 |---|---|---|
+| Duolingo App UI – Free UI Kit (Recreated), Figma Community (`~/Downloads/…-2.zip`, 7 exported screens) | Studied (rendered to images) | Principles only: chunky full-width buttons with a darker bottom edge, close button plus thin progress bar in lessons, big centred questions, bordered choices that turn blue when selected, a matching-pairs exercise, a starry deep-blue surface, a mascot speaking in bubbles. No owl, logo, illustration or branding reused. |
 | nextlevelbuilder/ui-ux-pro-max-skill | Installed, run | `search.py --design-system` for "gamified language learning students playful" gave indigo + progress-green and a rounded display face. I kept the palette logic, replaced Comic Neue with Plus Jakarta Sans for teenage legibility, and followed its pre-delivery checklist (44px targets, 4.5:1 contrast, reduced motion, 375–1440 checks). |
 | VoltAgent/awesome-design-md | Consulted | Studied how brand DESIGN.md files structure tokens and prose. No brand was copied. |
 | nexu-io/open-design | Consulted, not launched | Needs its desktop app or daemon plus `od mcp install`, which edits global Claude config, so it was not launched. Its skill catalogue was reviewed for reference. |
@@ -22,3 +23,12 @@ All 17 repositories were verified to exist (GitHub API, 29 Oct 2026), shallow-cl
 | LottieFiles/motion-design-skill | Installed, applied | Choreography and emotion-to-motion guidance for success, error shake and celebration. No Lottie runtime added (too heavy for small effects). |
 | AThevon/genjutsu | Consulted | Reviewed its motion and mobile-principles skills; it overlaps with the Emil and GSAP guidance already applied, so nothing extra was installed. |
 | dataviz (bundled skill) | Applied | XP chart: single series, no legend, 4px data-ends, 2px gaps, hover values, hidden data table; palette validated with `validate_palette.js`. |
+
+## Redesign pass (Hutan Ceria)
+
+- **UI/UX Pro Max** re-run for "playful gamified language learning app vibrant mascot": still proposed indigo; the brief's green-led palette won, but its rounded display type and "progress animations + achievement unlocks" effects were adopted (Nunito instead of the suggested Comic Neue for legibility).
+- **Google DESIGN.md lint**: 0 errors, 0 warnings. Contrast checks forced dark text on every bright fill (white on #58CC02 is only 2.1:1).
+- **Hallmark sloplint**: 0 FAIL, 0 REFLEX; gate 7b (pure white surfaces) waived on the record for answer cards on the cream page.
+- **taste-skill inspect --app** on Latihan: fixed "covered text" (the confetti canvas now mounts only while falling). Remaining findings (emoji content, tactile bottom shadows, coloured icon blocks, cream ground) are direct requirements of this brief and were kept deliberately.
+- **Emil Kowalski / motion-design / GSAP**: easing tokens plus a spring for the nav indicator, press feedback at 110ms, the gentle 2.4s node pulse instead of flashing, entrance timelines scoped with `useGSAP`, everything off under reduced motion.
+- **React Bits ClickSpark** on correct answers and saves; confetti is a small in-house canvas (no extra animation library).

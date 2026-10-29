@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Trophy, Lock, Pencil, Trash2, Bookmark, ArrowRight } from 'lucide-react';
+import { Pencil, Trash2, Bookmark, ArrowRight } from 'lucide-react';
+import { AchievementBadge } from '../../components/Badge';
 import { useProgress, useStore } from '../../app/store';
 import { ACHIEVEMENTS, currentStreak, longestStreak, masteredIds, quizAccuracy, isMastered } from '../../lib/progress';
 import { addDays, dateKey } from '../../lib/date';
@@ -96,7 +97,7 @@ export default function ProfilePage() {
         </section>
       </div>
 
-      <SectionTitle>Pencapaian</SectionTitle>
+      <SectionTitle id="pencapaian">Pencapaian</SectionTitle>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ACHIEVEMENTS.map((a) => {
           const got = !!s.achievements[a.id];
@@ -104,7 +105,7 @@ export default function ProfilePage() {
           return (
             <li key={a.id} className={`rounded-[var(--radius-lg)] border p-4 ${got ? 'border-sun bg-sun-soft' : 'border-line bg-surface'}`}>
               <div className="flex items-center gap-2">
-                <span className={`grid size-9 place-items-center rounded-full ${got ? 'bg-sun text-ink' : 'bg-surface-sunk text-ink-subtle'}`}>{got ? <Trophy className="size-4.5" aria-hidden /> : <Lock className="size-4" aria-hidden />}</span>
+                <AchievementBadge id={a.id} unlocked={got} className="size-11" />
                 <p className="font-[720]">{a.title}</p>
               </div>
               <p className={`mt-2 text-[0.8125rem] ${got ? 'text-sun-ink' : 'text-ink-muted'}`}>{a.rule}</p>
@@ -122,7 +123,7 @@ export default function ProfilePage() {
 
       <SectionTitle id="kegemaran">Kegemaran</SectionTitle>
       {favourites.length ? (
-        <div className="grid gap-3 md:grid-cols-2">{favourites.map((r) => <PeribahasaRow key={r.id} r={r} trailing={<Bookmark className="mt-1 size-5 shrink-0 fill-primary text-primary" aria-hidden />} />)}</div>
+        <div className="grid gap-3 md:grid-cols-2">{favourites.map((r) => <PeribahasaRow key={r.id} r={r} trailing={<Bookmark className="mt-1 size-5 shrink-0 fill-primary text-primary-ink" aria-hidden />} />)}</div>
       ) : (
         <EmptyState art={<Mascot mood="read" className="size-20" />} title="Belum ada peribahasa disimpan" action={<Link to="/cari" className="btn btn-secondary btn-sm">Cari peribahasa</Link>}>Tekan “Simpan” pada mana-mana peribahasa. Peribahasa yang disimpan muncul dahulu dalam kad imbas.</EmptyState>
       )}
@@ -138,7 +139,7 @@ export default function ProfilePage() {
           ))}
         </ul>
       ) : (
-        <p className="text-ink-muted">Belum ada aktiviti. <Link to="/kuiz" className="font-[650] text-primary">Mulakan kuiz pertama <ArrowRight className="inline size-4" aria-hidden /></Link></p>
+        <p className="text-ink-muted">Belum ada aktiviti. <Link to="/kuiz" className="font-[650] text-primary-ink">Mulakan kuiz pertama <ArrowRight className="inline size-4" aria-hidden /></Link></p>
       )}
 
       <SectionTitle>Tetapan dan data</SectionTitle>

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { X, Check, ArrowRight, Timer, RotateCcw, BookmarkPlus, CheckCircle2, XCircle } from 'lucide-react';
-import { buildQuiz, type QuizQuestion } from '../../lib/quiz';
+import { buildQuiz, meaningQuestion, type QuizQuestion } from '../../lib/quiz';
+import { QuestionPrompt, optionClass, type OptionState } from '../../components/QuestionPrompt';
+import { fireConfetti } from '../../components/Celebrate';
+import { mistakeIds } from '../../lib/progress';
+import { seeded, hashString } from '../../lib/random';
 import { BY_ID, CORE } from '../../lib/data';
 import { MODE_LABEL, type QuizMode } from '../../lib/progress';
 import { useProgress, useStore } from '../../app/store';
@@ -12,8 +16,8 @@ import { ProgressBar, EmptyState } from '../../components/ui';
 import ClickSpark, { type ClickSparkHandle } from '../../components/ui/ClickSpark';
 import { Mascot } from '../../components/Mascot';
 
-type PlayMode = Exclude<QuizMode, 'maksud'>;
-const MODES: PlayMode[] = ['emoji', 'kosong', 'konteks'];
+type PlayMode = QuizMode;
+const MODES: PlayMode[] = ['maksud', 'emoji', 'kosong', 'konteks'];
 
 interface Answer { picked: number; correct: boolean; timedOut: boolean; xp: number }
 
@@ -32,7 +36,17 @@ function Session({ mode }: { mode: PlayMode }) {
   const store = useStore();
   const timerOn = useProgress((s) => s.settings.timer) && mode === 'kosong';
   const [sessionId, setSessionId] = useState(() => `${mode}-${Date.now()}`);
-  const questions = useMemo(() => buildQuiz(mode, { byId: BY_ID, pool: CORE }, sessionId), [mode, sessionId]);
+  const [params] = useSearchParams();
+  const fromMistakes = params.get('dari') === 'kesilapan' && mode === 'maksud';
+  const questions = useMemo(() => {
+    if (fromMistakes) {
+      const rand = seeded(hashString(sessionId));
+      const ids = mistakeIds(store.getState()).slice(0, 8);
+      const qs = ids.map((id) => BY_ID.get(id)).filter((r): r is NonNullable<typeof r> => !!r).map((r) => meaningQuestion(r, CORE, rand));
+      if (qs.length) return qs;
+    }
+    return buildQuiz(mode, { byId: BY_ID, pool: CORE }, sessionId);
+  }, [mode, sessionId, fromMistakes, store]);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [done, setDone] = useState(false);
@@ -107,7 +121,7 @@ function Session({ mode }: { mode: PlayMode }) {
         )}
       </div>
 
-      <Question q={q} />
+      <QuestionPrompt q={q} />
 
       <ClickSpark ref={spark} manual sparkColor={['#2BB673', '#FFC845', '#5B3FD8']} sparkCount={14} sparkRadius={46} className="!h-auto">
         <ol className="mt-6 space-y-2.5" aria-label="Pilihan jawapan">
@@ -120,14 +134,12 @@ function Session({ mode }: { mode: PlayMode }) {
                   onClick={() => answer(i)}
                   disabled={!!answered}
                   aria-describedby={answered ? 'maklum-balas' : undefined}
-                  className={`group flex min-h-14 w-full items-center gap-3 rounded-[16px] border-2 px-4 py-3 text-left transition-[background-color,border-color,transform,opacity] duration-150 active:scale-[0.99] ${
-                    state === 'correct' ? 'pop border-mint bg-mint-soft' : state === 'wrong' ? 'shake border-coral bg-coral-soft' : state === 'dim' ? 'border-line opacity-55' : 'border-line-strong bg-surface hover:border-primary hover:bg-primary-soft/40'
-                  }`}
+                  className={`group flex min-h-14 w-full items-center gap-3 rounded-[16px] border-2 px-4 py-3 text-left font-[700] transition-[background-color,border-color,transform,opacity] duration-150 active:translate-y-[3px] ${optionClass(state as OptionState)}`}
                 >
-                  <span className={`tnum grid size-8 shrink-0 place-items-center rounded-[10px] text-[0.875rem] font-[750] ${state === 'correct' ? 'bg-mint text-on-primary' : state === 'wrong' ? 'bg-coral text-on-primary' : 'bg-surface-sunk text-ink-muted group-hover:text-primary'}`}>
+                  <span className={`tnum grid size-8 shrink-0 place-items-center rounded-[10px] text-[0.875rem] font-[750] ${state === 'correct' ? 'bg-mint text-on-primary' : state === 'wrong' ? 'bg-coral text-on-primary' : 'bg-surface-sunk text-ink-muted group-hover:text-primary-ink'}`}>
                     {state === 'correct' ? <Check className="size-4" aria-hidden /> : state === 'wrong' ? <X className="size-4" aria-hidden /> : String.fromCharCode(65 + i)}
                   </span>
-                  <span className={mode === 'kosong' ? 'text-[1.0625rem] font-[650]' : 'saying text-[1.0625rem]'}>{o.label}</span>
+                  <span className={mode === 'kosong' || mode === 'maksud' ? 'text-[1rem]' : 'saying text-[1.0625rem] font-[560]'}>{o.label}</span>
                   {state === 'correct' && <span className="sr-only">(jawapan betul)</span>}
                   {state === 'wrong' && <span className="sr-only">(pilihan kamu, salah)</span>}
                 </button>
@@ -139,13 +151,18 @@ function Session({ mode }: { mode: PlayMode }) {
 
       {answered && (
         <div id="maklum-balas" role="status" className={`rise-in mt-5 rounded-[var(--radius-lg)] p-5 ${answered.correct ? 'bg-mint-soft' : 'bg-coral-soft'}`}>
-          <p className={`flex items-center gap-2 font-[750] ${answered.correct ? 'text-mint' : 'text-coral'}`}>
+          <div className="flex items-start gap-3">
+          <Mascot mood={answered.correct ? 'cheer' : 'encourage'} className={`size-16 shrink-0 ${answered.correct ? 'hop' : 'wiggle'}`} />
+          <div className="min-w-0 flex-1">
+          <p className={`flex flex-wrap items-center gap-2 text-[1.125rem] font-[900] ${answered.correct ? 'text-mint' : 'text-coral'}`}>
             {answered.correct ? <CheckCircle2 className="size-5" aria-hidden /> : <XCircle className="size-5" aria-hidden />}
             {answered.correct ? PRAISE[correctCount % PRAISE.length] : answered.timedOut ? 'Masa tamat. Jom fahami jawapannya.' : 'Hampir tepat! Cuba fahami maksudnya sekali lagi.'}
             {answered.xp > 0 && <span className="ml-auto rounded-full bg-sun px-2.5 py-0.5 text-[0.8125rem] text-ink">+{answered.xp} XP</span>}
           </p>
           {!answered.correct && <p className="mt-2"><span className="font-[650]">Jawapan: </span><span className="saying">{q.options[q.correctIndex].label}</span></p>}
-          <p className="mt-2 leading-relaxed text-ink">{q.explanation}</p>
+          <p className="mt-2 font-[600] leading-relaxed text-ink">{q.explanation}</p>
+          </div>
+          </div>
           {answered.correct && answered.xp === 0 && <p className="mt-2 text-[0.8125rem] text-ink-muted">XP untuk peribahasa ini sudah diberi hari ini; jawapan kamu tetap dikira untuk penguasaan.</p>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button ref={nextRef} type="button" className="btn btn-primary" onClick={next}>
@@ -155,35 +172,6 @@ function Session({ mode }: { mode: PlayMode }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Question({ q }: { q: QuizQuestion }) {
-  if (q.mode === 'emoji') {
-    return (
-      <div className="mt-4 rounded-[var(--radius-xl)] bg-surface-sunk px-4 py-8 text-center">
-        <p className="text-[0.9375rem] font-[650] text-ink-muted">Peribahasa apakah ini?</p>
-        <p role="img" aria-label={q.promptLabel} className="mt-3 text-[2.75rem] leading-tight tracking-[0.08em] sm:text-[3.5rem]">{q.prompt}</p>
-      </div>
-    );
-  }
-  if (q.mode === 'kosong') {
-    return (
-      <div className="mt-4">
-        <p className="text-[0.9375rem] font-[650] text-ink-muted">Lengkapkan peribahasa ini:</p>
-        <p className="saying mt-2 text-[1.75rem] leading-snug sm:text-[2rem]">
-          {q.prompt.split('____').map((part, i, arr) => (
-            <span key={i}>{part}{i < arr.length - 1 && <span className="mx-1 inline-block min-w-[4ch] rounded-[8px] border-b-[3px] border-primary bg-primary-soft px-2 text-center text-primary" aria-label="tempat kosong">?</span>}</span>
-          ))}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-4">
-      <p className="text-[0.9375rem] font-[650] text-ink-muted">Pilih peribahasa yang paling sesuai untuk situasi ini:</p>
-      <p className="mt-2 rounded-[var(--radius-lg)] border border-line bg-surface p-5 text-[1.125rem] leading-relaxed">{q.prompt}</p>
     </div>
   );
 }
@@ -198,6 +186,7 @@ function Results({ mode, questions, answers, onRestart }: { mode: PlayMode; ques
   const xp = useProgress((s) => s.quizHistory[0]?.xp ?? 0);
   const wrong = questions.filter((q) => answers[q.key] && !answers[q.key].correct);
   const ratio = correct / questions.length;
+  useEffect(() => { if (ratio >= 0.875) fireConfetti(); }, [ratio]);
 
   useGSAP(() => {
     if (reduced) return;

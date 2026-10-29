@@ -93,12 +93,12 @@ function Detail({ r }: { r: Peribahasa }) {
         <div className="mt-5 flex flex-wrap gap-2">
           <ClickSpark ref={spark} manual sparkColor={['#5B3FD8', '#FFC845', '#F2762E']} sparkCount={10} sparkRadius={28} className="!h-auto !w-auto">
             <button type="button" onClick={toggleSave} aria-pressed={saved} className={`btn btn-sm ${saved ? 'btn-primary' : 'btn-secondary'}`}>
-              {saved ? <BookmarkCheck className="size-4" aria-hidden /> : <Bookmark className="size-4" aria-hidden />}
+              <span key={String(saved)} className={saved ? 'pop inline-flex' : 'inline-flex'}>{saved ? <BookmarkCheck className="size-4" aria-hidden /> : <Bookmark className="size-4" aria-hidden />}</span>
               {saved ? 'Disimpan' : 'Simpan'}
             </button>
           </ClickSpark>
           <button type="button" onClick={copy} className="btn btn-secondary btn-sm">
-            {copied === 'ok' ? <Check className="size-4 text-mint" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+            {copied === 'ok' ? <Check className="pop size-4 text-mint" aria-hidden /> : <Copy className="size-4" aria-hidden />}
             {copied === 'ok' ? 'Disalin' : copied === 'fail' ? 'Gagal disalin' : 'Salin'}
           </button>
           <button
@@ -201,9 +201,10 @@ function Detail({ r }: { r: Peribahasa }) {
               <li key={`${s.id}-${i}`} className="border-t border-line pt-2.5 text-[0.875rem]">
                 <p className="font-[650]">{sourceTitle(s.id)}</p>
                 {s.tingkatan && <p className="text-ink-muted">{s.tingkatan}</p>}
+                {s.page && <p className="text-ink-muted">Halaman {s.page}</p>}
                 {s.maksud && <p className="mt-0.5 text-ink-muted">Maksud dalam sumber ini: {s.maksud}</p>}
                 {s.note && <p className="mt-0.5 text-ink-muted">{s.note}</p>}
-                {s.url && <a href={s.url} target="_blank" rel="noreferrer" className="mt-0.5 inline-flex items-center gap-1 font-[650] text-primary">Lihat di PRPM <ExternalLink className="size-3.5" aria-hidden /></a>}
+                {s.url && <a href={s.url} target="_blank" rel="noreferrer" className="mt-0.5 inline-flex items-center gap-1 font-[650] text-primary-ink">Lihat di PRPM <ExternalLink className="size-3.5" aria-hidden /></a>}
               </li>
             ))}
           </ul>

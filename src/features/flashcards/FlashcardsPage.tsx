@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router';
 import { RotateCw, ArrowRight, X, CalendarClock } from 'lucide-react';
 import { useProgress, useStore } from '../../app/store';
 import { buildQueues, sessionCards, NEW_PER_DAY } from './queue';
+import { mistakeIds } from '../../lib/progress';
+import { BY_ID } from '../../lib/data';
 import { rate, type Rating } from '../../lib/srs';
 import { relativeDue } from '../../lib/date';
 import { useDocumentTitle } from '../../hooks/media';
@@ -23,13 +25,18 @@ export default function FlashcardsPage() {
   const room = Math.max(0, NEW_PER_DAY - queues.newToday);
 
   useEffect(() => {
-    if (params.get('mula') === '1' && !session && startable.length) {
-      setSession(startable);
+    const from = params.get('dari');
+    // Saved or mistaken sayings can be drilled directly, regardless of their schedule.
+    const custom = from === 'simpanan' ? state.favourites : from === 'kesilapan' ? mistakeIds(state) : null;
+    const list = custom ? custom.map((id) => BY_ID.get(id)).filter((r): r is Peribahasa => !!r).slice(0, 15) : startable;
+    if ((params.get('mula') === '1' || custom) && !session && list.length) {
+      setSession(list);
       const next = new URLSearchParams(params);
       next.delete('mula');
+      next.delete('dari');
       setParams(next, { replace: true });
     }
-  }, [params, session, startable, setParams]);
+  }, [params, session, startable, setParams, state]);
 
   if (session) return <Session cards={session} onExit={() => setSession(null)} />;
 

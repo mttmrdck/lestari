@@ -141,8 +141,91 @@ export function buildBlankQuiz(ctx: Ctx, seed: number, n = SESSION_LENGTH): Quiz
   });
 }
 
-export function buildQuiz(mode: Exclude<QuizMode, 'maksud'>, ctx: Ctx, sessionId: string): QuizQuestion[] {
+// ---------- Teka Maksud ----------
+
+/** Wrong meanings come from sayings with a different main theme, never a variant or a related saying. */
+export function meaningDistractors(r: Peribahasa, pool: Peribahasa[], rand: () => number, n = 3): string[] {
+  const banned = new Set([r.id, ...r.variants, ...r.relatedPeribahasa]);
+  const out: string[] = [];
+  for (const o of shuffle(pool, rand)) {
+    if (out.length >= n) break;
+    if (banned.has(o.id) || o.themes[0] === r.themes[0] || o.maksud === r.maksud || out.includes(o.maksud)) continue;
+    if (o.maksud.length < 12 || Math.abs(o.maksud.length - r.maksud.length) > 60) continue;
+    out.push(o.maksud);
+  }
+  return out;
+}
+
+export function meaningQuestion(r: Peribahasa, pool: Peribahasa[], rand: () => number): QuizQuestion {
+  const { options, correctIndex } = withOptions({ label: r.maksud, recordId: r.id }, meaningDistractors(r, pool, rand).map((label) => ({ label })), rand);
+  return {
+    key: `maksud:${r.id}`, mode: 'maksud', recordId: r.id, difficulty: r.difficulty,
+    prompt: r.peribahasa, options, correctIndex,
+    explanation: `${r.peribahasa} bermaksud ${r.maksud.charAt(0).toLowerCase()}${r.maksud.slice(1)}`,
+  };
+}
+
+export function buildMeaningQuiz(ctx: Ctx, seed: number, n = SESSION_LENGTH): QuizQuestion[] {
+  const rand = seeded(seed);
+  return progression(ctx.pool.map((r) => ({ r, difficulty: r.difficulty })), rand, n).map(({ r }) => meaningQuestion(r, ctx.pool, rand));
+}
+
+export function blankQuestion(r: Peribahasa, ctx: Ctx, rand: () => number): QuizQuestion | null {
+  const b = chooseBlank(r);
+  if (!b) return null;
+  const texts = new Set(ctx.pool.map((x) => x.normalizedText));
+  const words = [...new Set(ctx.pool.map(chooseBlank).filter((x): x is Blank => !!x).map((x) => normalize(x.word)))];
+  const answer = normalize(b.word);
+  const distractors: string[] = [];
+  for (const w of shuffle(words, rand)) {
+    if (distractors.length === 3) break;
+    if (w === answer || distractors.includes(w)) continue;
+    const tokens = tokenize(r.peribahasa);
+    tokens[b.tokenIndex] = w;
+    if (texts.has(tokens.join(' '))) continue;
+    distractors.push(w);
+  }
+  const { options, correctIndex } = withOptions({ label: answer }, distractors.map((label) => ({ label })), rand);
+  return { key: `kosong:${r.id}`, mode: 'kosong', recordId: r.id, difficulty: r.difficulty, prompt: blankedText(b), options, correctIndex, explanation: `${r.peribahasa}: ${r.maksud}` };
+}
+
+// ---------- Lessons ----------
+
+export type LessonStep =
+  | { kind: 'teach'; record: Peribahasa }
+  | { kind: 'question'; q: QuizQuestion }
+  | { kind: 'match'; key: string; pairs: { id: string; left: string; right: string }[] };
+
+/** Teach four sayings, then practise them with mixed exercise types. */
+export function buildLessonSteps(sayings: Peribahasa[], ctx: Ctx, runId: string): LessonStep[] {
+  const rand = seeded(hashString(runId));
+  const steps: LessonStep[] = sayings.map((record) => ({ kind: 'teach', record }));
+  const questions: QuizQuestion[] = [];
+  for (const r of sayings) questions.push(meaningQuestion(r, ctx.pool, rand));
+  for (const r of shuffle(sayings, rand).slice(0, 2)) { const q = blankQuestion(r, ctx, rand); if (q) questions.push(q); }
+  const ids = new Set(sayings.map((r) => r.id));
+  const situ = SITUATIONS.find((x) => ids.has(x.answer) && x.distractors.every((d) => ctx.byId.has(d)));
+  if (situ) {
+    const r = ctx.byId.get(situ.answer)!;
+    const { options, correctIndex } = withOptions({ label: r.peribahasa, recordId: r.id }, situ.distractors.map((d) => ({ label: ctx.byId.get(d)!.peribahasa, recordId: d })), rand);
+    questions.push({ key: `konteks:${situ.id}`, mode: 'konteks', recordId: r.id, difficulty: situ.difficulty, prompt: situ.situasi, options, correctIndex, explanation: situ.penerangan });
+  }
+  const emoji = EMOJI_PUZZLES.find((p) => ids.has(p.answer));
+  if (emoji) {
+    const r = ctx.byId.get(emoji.answer)!;
+    const others = shuffle(EMOJI_PUZZLES.filter((o) => o.answer !== r.id && !r.variants.includes(o.answer)), rand).slice(0, 3).map((o) => ctx.byId.get(o.answer)!).filter(Boolean);
+    const { options, correctIndex } = withOptions({ label: r.peribahasa, recordId: r.id }, others.map((o) => ({ label: o.peribahasa, recordId: o.id })), rand);
+    questions.push({ key: `emoji:${r.id}`, mode: 'emoji', recordId: r.id, difficulty: emoji.difficulty, prompt: emoji.emoji, promptLabel: emoji.label, options, correctIndex, explanation: `${r.peribahasa}: ${r.maksud}` });
+  }
+  const practice: LessonStep[] = shuffle(questions, rand).map((q) => ({ kind: 'question', q }));
+  // The matching round sits in the middle so it breaks up the multiple-choice rhythm.
+  practice.splice(Math.min(3, practice.length), 0, { kind: 'match', key: `padan:${sayings.map((r) => r.id).join('|')}`, pairs: sayings.map((r) => ({ id: r.id, left: r.peribahasa, right: r.maksud })) });
+  return [...steps, ...practice];
+}
+
+export function buildQuiz(mode: QuizMode, ctx: Ctx, sessionId: string): QuizQuestion[] {
   const seed = hashString(sessionId);
+  if (mode === 'maksud') return buildMeaningQuiz(ctx, seed);
   if (mode === 'emoji') return buildEmojiQuiz(ctx, seed);
   if (mode === 'konteks') return buildContextQuiz(ctx, seed);
   return buildBlankQuiz(ctx, seed);

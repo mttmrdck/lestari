@@ -61,7 +61,7 @@ export function Welcome() {
         <h1 className="font-display text-[2.6rem] font-[760] leading-[1.02] tracking-[-0.035em] sm:text-[3.5rem] lg:col-span-2 lg:text-[5rem] xl:text-[6rem]">
           <span className="w-line block lg:whitespace-nowrap">Fahami Makna.</span>
           <span className="w-line block lg:whitespace-nowrap">Kuasai Bahasa.</span>
-          <span className="w-line block text-primary lg:whitespace-nowrap">Hidupkan Peribahasa.</span>
+          <span className="w-line block text-primary-ink lg:whitespace-nowrap">Hidupkan Peribahasa.</span>
         </h1>
         <div className="-mt-4 lg:mt-0">
           <p className="w-copy max-w-[44ch] text-[1.0625rem] leading-relaxed text-ink-muted lg:text-[1.1875rem]">
@@ -114,7 +114,7 @@ export function Welcome() {
             <span className="absolute left-[19px] top-2 hidden h-[calc(100%-16px)] w-0.5 bg-line sm:left-0 sm:top-[19px] sm:block sm:h-0.5 sm:w-full" aria-hidden />
             {JOURNEY.map(({ icon: Icon, title, text }) => (
               <li key={title} className="relative flex gap-4 sm:flex-col sm:gap-3">
-                <span className="relative grid size-10 shrink-0 place-items-center rounded-full border-2 border-primary bg-surface text-primary">
+                <span className="relative grid size-10 shrink-0 place-items-center rounded-full border-2 border-primary bg-surface text-primary-ink">
                   <Icon className="size-5" strokeWidth={2} aria-hidden />
                 </span>
                 <div>

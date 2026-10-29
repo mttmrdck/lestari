@@ -9,6 +9,6 @@ if (seed) await page.evaluate((s) => localStorage.setItem('lestari:v1', s), seed
 await page.goto('http://localhost:4173' + path);
 await page.waitForTimeout(2600);
 const ov = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-await page.screenshot({ path: `${out}/${path.replace(/\W+/g, '_')}-${width}.png` });
+await page.screenshot({ path: `${out}/${path.replace(/\W+/g, '_')}-${width}.png`, fullPage: process.env.FULL === "1" });
 console.log(path, width, 'overflow', ov);
 await browser.close();

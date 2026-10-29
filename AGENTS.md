@@ -29,10 +29,10 @@ data/curated/            hand-written layer: review flags, corrections, PDF-only
 scripts/                 extract -> import -> validate pipeline, e2e checks
 src/data/                GENERATED knowledge base (peribahasa.json, sources.json); never edit
 src/content/             curated quiz and search content: emoji, situations, concepts, contrasts
-src/lib/                 framework-free logic: text, search, srs, progress store, quiz, daily, validate
+src/lib/                 framework-free logic: text, search, srs, progress store, quiz, daily, lessons, validate
 src/app/                 store binding and app shell (navigation, toasts)
-src/components/          Mascot (Bayu), UI primitives, React Bits ClickSpark
-src/features/<area>/     screens: home, search, detail, quiz, flashcards, progress, daily-challenge, misc
+src/components/          Mascot (Bayu, 7 moods), LearningPath, Badge, Celebrate (confetti, count-up), QuestionPrompt, UI primitives, React Bits ClickSpark
+src/features/<area>/     screens: home, path, lesson, search, detail, quiz, flashcards, favourites, progress, daily-challenge, misc
 src/test/                Vitest suites
 docs/                    data-quality report, learning model, design DNA, resources log
 ```
@@ -44,13 +44,14 @@ docs/                    data-quality report, learning model, design DNA, resour
 - **Provenance is mandatory.** Source text stays as written (spelling fixes keep `maksudAsal`). LESTARI-written examples are `origin: "disediakan-lestari"`. A record added from outside the supplied documents needs PRPM evidence and a `sourceUrl`. Never invent a peribahasa or a meaning.
 - **Honest product.** No fake statistics, no "AI" label on local matching, no XP without a learning action. XP rules live in `src/lib/progress.ts` (`XP`) and `docs/learning-model.md`; keep them in step.
 - **Sensitive records** (`data/curated/review.json`) stay searchable but must not appear in quizzes, flashcards or the daily puzzle. Use `LEARNABLE` or `CORE`, never `RECORDS`, for anything that teaches.
+- **Lessons** live in `src/lib/lessons.ts`. Units group sayings by meaning-derived theme plus hand-checked `include`/`exclude` lists; a saying belongs to one lesson only. Check a new grouping by reading every saying's meaning.
 - **Copy** is Malaysian Bahasa Melayu, second person (`kamu`), encouraging, never shaming.
 
 ## Design system maintenance
 
 - Tokens live in two places that must match: the YAML front matter of `DESIGN.md` and the `@theme` block in `src/index.css`. Change `DESIGN.md` first, run `npm run design:lint` (0 errors, 0 warnings, WCAG contrast checked), then mirror the change in CSS.
 - Use token utilities (`bg-primary`, `text-ink-muted`, `rounded-[var(--radius-lg)]`). No raw colours in components. Hallmark's sloplint enforces this: `node .claude/skills/hallmark/scripts/sloplint.mjs src/index.css src/features src/components src/app --scope app` should report 0 FAIL.
-- Motion: CSS transitions for hover, press and the flip; GSAP (`useGSAP`, scoped, reduced-motion aware) for one authored moment per screen. Animate only `transform`, `opacity` and `clip-path`. Never `transition: all`.
+- Motion: CSS for presses (edge collapse), page entrance, idle loops and the flip; GSAP (`useGSAP`, scoped, reduced-motion aware) for dashboard entrance, results and achievement timelines; `fireConfetti()` only for milestones (lesson passed, daily solved, badge unlocked, 7/8+ quiz). Animate only `transform`, `opacity` and `clip-path`. Never `transition: all`.
 - Icons are Lucide only. Emoji appear only as Teka Emoji content.
 - Project-scoped design skills are installed in `.claude/skills/` (UI/UX Pro Max, Impeccable, taste-skill, Hallmark, Emil Kowalski's animate and improve-animations, GSAP, motion-design, design-dna). See `docs/design-resources.md` for how each was used.
 

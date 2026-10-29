@@ -20,7 +20,7 @@ export default function AboutPage() {
             <p className="font-[680]">{s.title}</p>
             <p className="mt-0.5 text-[0.875rem] text-ink-muted">{s.origin}</p>
             <p className="tnum mt-1 text-[0.8125rem] text-ink-subtle">{count((r) => r.sources.some((x) => x.id === s.id))} peribahasa merujuk sumber ini</p>
-            {s.kind === 'rujukan-luar' && <a href="https://prpm.dbp.gov.my" target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[0.875rem] font-[650] text-primary">prpm.dbp.gov.my <ExternalLink className="size-3.5" aria-hidden /></a>}
+            {s.kind === 'rujukan-luar' && <a href="https://prpm.dbp.gov.my" target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[0.875rem] font-[650] text-primary-ink">prpm.dbp.gov.my <ExternalLink className="size-3.5" aria-hidden /></a>}
           </li>
         ))}
       </ul>

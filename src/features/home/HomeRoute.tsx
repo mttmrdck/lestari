@@ -1,177 +1,234 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router';
-import { ArrowRight, Search, Smile, TextCursorInput, MessagesSquare, Flame, CalendarCheck, Bookmark, RotateCcw } from 'lucide-react';
+import { useMemo, useRef } from 'react';
+import { Link, useLocation } from 'react-router';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
+import { ArrowRight, Search, Smile, TextCursorInput, MessagesSquare, Layers, BookOpenCheck, Flame, Sparkles, Trophy, Star, Gift } from 'lucide-react';
 import { useProgress } from '../../app/store';
 import { Welcome } from './Welcome';
 import { Mascot } from '../../components/Mascot';
-import { PeribahasaRow, ProgressBar, SectionTitle, EmptyState, CategoryBadge } from '../../components/ui';
+import { ProgressBar } from '../../components/ui';
+import { UnitBanner, PathNodes } from '../../components/LearningPath';
+import { AchievementBadge } from '../../components/Badge';
+import { useCountUp } from '../../components/Celebrate';
 import { CORE } from '../../lib/data';
-import { currentStreak, masteredIds } from '../../lib/progress';
-import { dateKey, formatDateMs } from '../../lib/date';
+import { ACHIEVEMENTS, currentStreak, masteredIds } from '../../lib/progress';
+import { dateKey } from '../../lib/date';
 import { dailyAnswer, dailyPool } from '../../lib/daily';
-import { hashString } from '../../lib/random';
+import { UNITS, LESSONS, nodeStates, currentLesson } from '../../lib/lessons';
 import { buildQueues } from '../flashcards/queue';
-import { useDocumentTitle } from '../../hooks/media';
+import { useDocumentTitle, useReducedMotion } from '../../hooks/media';
 
 export function HomeRoute() {
   const hasProfile = useProgress((s) => !!s.profile);
   return hasProfile ? <Home /> : <Welcome />;
 }
 
+const pool = dailyPool(CORE);
+
+const ACTIVITIES = [
+  { to: '/cari', icon: Search, title: 'Cari Peribahasa', text: 'Kata kunci atau situasi', tone: 'sky' },
+  { to: '/kuiz/maksud', icon: BookOpenCheck, title: 'Teka Maksud', text: 'Pilih maksud yang betul', tone: 'green' },
+  { to: '/kuiz/konteks', icon: MessagesSquare, title: 'Padankan Situasi', text: 'Peribahasa ikut konteks', tone: 'rose' },
+  { to: '/kuiz/kosong', icon: TextCursorInput, title: 'Lengkapkan', text: 'Isi perkataan yang hilang', tone: 'lavender' },
+  { to: '/kuiz/emoji', icon: Smile, title: 'Kuiz Emoji', text: 'Teka daripada gambar', tone: 'sun' },
+  { to: '/kad-imbas?mula=1', icon: Layers, title: 'Kad Imbas', text: 'Ulang kaji tepat masanya', tone: 'sky' },
+] as const;
+
+const TONE: Record<string, string> = {
+  sky: 'bg-sky-soft text-sky-ink [--tile-edge:var(--color-sky)]',
+  green: 'bg-primary-soft text-on-primary-soft [--tile-edge:var(--color-primary)]',
+  rose: 'bg-rose-soft text-coral [--tile-edge:var(--color-rose)]',
+  lavender: 'bg-lavender-soft text-lavender-ink [--tile-edge:var(--color-lavender)]',
+  sun: 'bg-sun-soft text-sun-ink [--tile-edge:var(--color-sun)]',
+};
+const ICON_TONE: Record<string, string> = { sky: 'bg-sky text-on-sky', green: 'bg-primary text-on-primary', rose: 'bg-rose text-on-rose', lavender: 'bg-lavender text-on-lavender', sun: 'bg-sun text-ink' };
+
 function greeting() {
   const h = new Date().getHours();
   return h < 12 ? 'Selamat pagi' : h < 15 ? 'Selamat tengah hari' : h < 19 ? 'Selamat petang' : 'Selamat malam';
 }
 
-const pool = dailyPool(CORE);
-
 function Home() {
   useDocumentTitle('Utama');
   const state = useProgress((s) => s);
+  const { state: nav } = useLocation() as { state: { justCompleted?: string } | null };
+  const scope = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
   const today = dateKey();
   const profile = state.profile!;
   const streak = currentStreak(state.activeDays, today);
   const xpToday = state.xpByDay[today] ?? 0;
+  const xpShown = useCountUp(state.xpTotal);
   const mastered = masteredIds(state).length;
   const queues = useMemo(() => buildQueues(state), [state]);
+  const states = useMemo(() => nodeStates(state.lessonsDone), [state.lessonsDone]);
+  const current = currentLesson(state.lessonsDone);
+  const unitIndex = Math.max(0, UNITS.findIndex((u) => u.lessons.some((l) => l.id === current?.id)));
+  const unit = current ? UNITS[unitIndex] : UNITS[UNITS.length - 1];
+  const doneInUnit = unit.lessons.filter((l) => state.lessonsDone[l.id]).length;
   const daily = state.daily[today];
+  const dailyDone = !!daily && daily.status !== 'playing';
   const dailyRecord = dailyAnswer(pool, today);
-  // Recommendation: a different saying from the daily puzzle, stable for the day.
-  const pick = useMemo(() => {
-    const candidates = CORE.filter((r) => r.id !== dailyRecord.id && r.contohAyat.length > 0);
-    return candidates[hashString(`pilihan:${today}`) % candidates.length];
-  }, [today, dailyRecord.id]);
-  const fresh = state.xpTotal === 0 && Object.keys(state.cards).length === 0;
+  const lessonsDone = Object.keys(state.lessonsDone).length;
+  const returning = state.xpTotal > 0;
 
-  const next = queues.due.length
-    ? { title: `Ulang kaji ${queues.due.length} kad yang sudah tiba masanya`, text: 'Ulang kaji sekarang supaya peribahasa ini kekal dalam ingatan.', to: '/kad-imbas?mula=1', cta: 'Mula ulang kaji' }
-    : !daily || daily.status === 'playing'
-      ? { title: 'Teka Peribahasa Hari Ini', text: 'Tiga petunjuk, empat cubaan. Cabaran baharu setiap hari.', to: '/harian', cta: 'Cuba sekarang' }
-      : !state.quizHistory.some((q) => q.date === today)
-        ? { title: 'Uji pemahaman konteks', text: 'Baca situasi sebenar dan pilih peribahasa yang paling sesuai.', to: '/kuiz/konteks', cta: 'Mula kuiz' }
-        : { title: 'Kenali peribahasa baharu', text: `${Math.min(queues.fresh.length, 10)} kad baharu sedia untuk dipelajari.`, to: '/kad-imbas?mula=1', cta: 'Buka kad imbas' };
+  const nextBadges = useMemo(() => ACHIEVEMENTS
+    .map((a) => ({ a, got: !!state.achievements[a.id], v: Math.min(a.value(state), a.target) }))
+    .sort((x, y) => Number(x.got) - Number(y.got) || y.v / y.a.target - x.v / x.a.target)
+    .slice(0, 3), [state]);
 
-  const revision = [...new Set([...queues.due, ...queues.difficult, ...state.revisionList.map((id) => CORE.find((r) => r.id === id)).filter(Boolean)])].slice(0, 3) as typeof CORE;
+  useGSAP(() => {
+    if (reduced) return;
+    gsap.timeline({ defaults: { ease: 'power3.out' } })
+      .from('.h-hero-copy > *', { y: 16, opacity: 0, duration: 0.45, stagger: 0.07 })
+      .from('.h-hero-bayu', { y: 30, scale: 0.85, opacity: 0, duration: 0.6, ease: 'back.out(1.7)' }, 0.05)
+      .from('.h-tile', { y: 18, opacity: 0, duration: 0.35, stagger: 0.05 }, 0.25);
+  }, { scope, dependencies: [reduced] });
 
   return (
-    <div className="space-y-8 lg:space-y-10">
-      <header className="flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[0.875rem] font-[600] text-ink-muted">{formatDateMs(today, true)}</p>
-          <h1 className="mt-1 text-[1.875rem] font-[740] leading-tight tracking-[-0.03em] sm:text-[2.25rem]">{greeting()}, {profile.name}.</h1>
-        </div>
-        <Mascot mood={fresh ? 'happy' : xpToday >= profile.dailyGoal ? 'cheer' : 'read'} className="hidden size-20 shrink-0 sm:block" />
-      </header>
-
-      {/* Today's numbers: type, not tiles */}
-      <section aria-label="Ringkasan hari ini" className="card grid grid-cols-2 gap-y-5 p-5 sm:grid-cols-4 sm:divide-x sm:divide-line sm:p-6">
-        <div className="sm:pr-5">
-          <p className="flex items-center gap-1.5 text-[0.8125rem] font-[650] text-ink-muted"><Flame className="size-4 text-casque" aria-hidden />Streak</p>
-          <p className="tnum mt-1 font-display text-[1.75rem] font-[720] leading-none">{streak}<span className="ml-1 text-[0.9375rem] font-[600] text-ink-muted">hari</span></p>
-        </div>
-        <div className="sm:px-5">
-          <p className="text-[0.8125rem] font-[650] text-ink-muted">Matlamat hari ini</p>
-          <p className="tnum mt-1 font-display text-[1.75rem] font-[720] leading-none">{xpToday}<span className="text-[0.9375rem] font-[600] text-ink-muted"> / {profile.dailyGoal} XP</span></p>
-          <ProgressBar value={xpToday} max={profile.dailyGoal} label="Kemajuan matlamat harian" className="mt-2.5" />
-        </div>
-        <div className="sm:px-5">
-          <p className="text-[0.8125rem] font-[650] text-ink-muted">Jumlah XP</p>
-          <p className="tnum mt-1 font-display text-[1.75rem] font-[720] leading-none">{state.xpTotal}</p>
-        </div>
-        <div className="sm:pl-5">
-          <p className="text-[0.8125rem] font-[650] text-ink-muted">Dikuasai</p>
-          <p className="tnum mt-1 font-display text-[1.75rem] font-[720] leading-none">{mastered}<span className="ml-1 text-[0.9375rem] font-[600] text-ink-muted">peribahasa</span></p>
-        </div>
-        {fresh && <p className="col-span-2 text-[0.875rem] text-ink-muted sm:col-span-4 sm:pt-1">Semua bermula dari sifar. Jawab satu soalan atau ulang kaji satu kad untuk memulakan streak kamu.</p>}
-      </section>
-
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-8">
-        <div className="min-w-0 space-y-8">
-          {/* Sambung Belajar */}
-          <section aria-labelledby="sambung" className="relative overflow-hidden rounded-[var(--radius-xl)] bg-primary p-6 text-on-primary sm:p-7">
-            <p className="text-[0.875rem] font-[650] text-on-primary/80">Sambung Belajar</p>
-            <h2 id="sambung" className="mt-1 max-w-[22ch] text-[1.5rem] font-[740] leading-tight tracking-[-0.02em]">{next.title}</h2>
-            <p className="mt-2 max-w-[40ch] text-[0.9375rem] text-on-primary/85">{next.text}</p>
-            <Link to={next.to} className="btn btn-sun mt-5">{next.cta} <ArrowRight className="size-5" aria-hidden /></Link>
-            <Mascot mood="happy" className="pointer-events-none absolute -bottom-6 -right-4 w-32 opacity-95 sm:w-40" />
-          </section>
-
-          {/* Peribahasa pilihan hari ini */}
-          <section aria-labelledby="pilihan">
-            <SectionTitle id="pilihan">Peribahasa pilihan hari ini</SectionTitle>
-            <Link to={`/peribahasa/${pick.id}`} className="card card-link block p-5 no-underline sm:p-6">
-              <CategoryBadge r={pick} />
-              <p className="saying mt-3 text-[1.625rem] leading-tight">{pick.peribahasa}</p>
-              <p className="mt-2 text-ink-muted">{pick.maksud}</p>
-              {pick.contohAyat[0] && <p className="mt-4 border-t border-line pt-4 text-[0.9375rem] text-ink">“{pick.contohAyat[0].text}”</p>}
-              <span className="mt-4 inline-flex items-center gap-1 text-[0.9375rem] font-[680] text-primary">Pelajari peribahasa ini <ArrowRight className="size-4" aria-hidden /></span>
-            </Link>
-          </section>
-
-          {/* Revision */}
-          <section aria-labelledby="ulangkaji">
-            <SectionTitle id="ulangkaji" action={<Link to="/kad-imbas" className="btn btn-quiet btn-sm">Semua kad</Link>}>Untuk diulang kaji</SectionTitle>
-            {revision.length ? (
-              <div className="space-y-3">
-                {revision.map((r) => <PeribahasaRow key={r.id} r={r} trailing={<RotateCcw className="mt-1 size-5 shrink-0 text-primary" aria-hidden />} />)}
+    <div ref={scope}>
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] lg:gap-8">
+        <div className="min-w-0 space-y-7">
+          {/* Hero */}
+          <section aria-labelledby="hero" className="relative overflow-hidden rounded-[28px] bg-primary px-5 pb-5 pt-6 text-on-primary shadow-[0_6px_0_var(--color-primary-edge)] sm:px-7 sm:pt-7">
+            <Sparkle className="left-[46%] top-5 size-5 text-sun" />
+            <Sparkle className="left-[58%] top-16 size-3 text-surface" />
+            <Sparkle className="right-6 top-6 size-4 text-surface" />
+            <div className="relative grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+              <div className="h-hero-copy min-w-0 pb-1">
+                <p className="text-[0.9375rem] font-[800] opacity-85">{greeting()}, {profile.name}!</p>
+                <h1 id="hero" className="mt-1 text-[2rem] font-[900] leading-[1.05] tracking-[-0.02em] sm:text-[2.625rem]">{returning ? 'Selamat kembali!' : 'Selamat datang!'}</h1>
+                <p className="mt-1 text-[1.125rem] font-[850] sm:text-[1.25rem]">Jom kuasai peribahasa hari ini.</p>
+                <p className="mt-2 max-w-[34ch] text-[0.9375rem] font-[700] opacity-90">
+                  {current ? <>Seterusnya: <strong className="font-[900]">{current.title}</strong> dalam unit {unit.title}.</> : 'Semua pelajaran selesai. Hebat! Teruskan ulang kaji.'}
+                </p>
+                <Link to={current ? `/pelajaran/${current.id}` : '/kad-imbas?mula=1'} className="btn btn-sun mt-5 min-h-[54px] px-6 text-[1.0625rem]">
+                  Jom Belajar! <ArrowRight className="size-5" aria-hidden />
+                </Link>
               </div>
-            ) : (
-              <EmptyState art={<Mascot mood="think" className="size-20" />} title="Belum ada kad untuk diulang kaji" action={<Link to="/kad-imbas?mula=1" className="btn btn-secondary btn-sm">Mulakan kad baharu</Link>}>
-                Kad yang kamu tanda susah atau yang tiba masa ulang kaji akan muncul di sini.
-              </EmptyState>
-            )}
+              <Mascot mood={returning ? 'wave' : 'happy'} idle className="h-hero-bayu -mb-3 -mr-3 w-36 shrink-0 sm:w-48" label="Bayu, burung enggang pemandu LESTARI" />
+            </div>
+            <div className="relative mt-5 rounded-[16px] bg-surface p-3 text-ink">
+              <div className="flex items-center justify-between text-[0.875rem] font-[850]">
+                <span>Matlamat hari ini</span>
+                <span className="tnum text-primary-ink">{xpToday}/{profile.dailyGoal} XP</span>
+              </div>
+              <ProgressBar value={xpToday} max={profile.dailyGoal} label="Kemajuan matlamat harian" className="mt-2 h-3.5" />
+              <p className="mt-2 text-[0.8125rem] font-[700] text-ink-muted">
+                {xpToday >= profile.dailyGoal ? 'Matlamat tercapai! Bayu bangga dengan kamu.' : '“Berdikit-dikit, lama-lama jadi bukit!”'}
+              </p>
+            </div>
+          </section>
+
+          {/* Learning path */}
+          <section aria-labelledby="laluan">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <h2 id="laluan" className="text-[1.375rem] font-[900]">Laluan pembelajaran</h2>
+              <Link to="/laluan" className="btn btn-quiet btn-sm">Semua unit</Link>
+            </div>
+            <UnitBanner unit={unit} number={unitIndex + 1} done={doneInUnit} />
+            <PathNodes unit={unit} states={states} highlight={nav?.justCompleted} />
+            <p className="text-center text-[0.875rem] font-[700] text-ink-muted"><span className="tnum">{lessonsDone}</span> daripada <span className="tnum">{LESSONS.length}</span> pelajaran selesai</p>
           </section>
         </div>
 
-        <aside className="min-w-0 space-y-8">
+        <aside className="min-w-0 space-y-7">
           {/* Daily challenge */}
-          <section aria-labelledby="harian" className="on-night rounded-[var(--radius-xl)] bg-night p-6 text-on-night">
-            <div className="flex items-center justify-between gap-3">
-              <p className="flex items-center gap-2 text-[0.875rem] font-[650] text-on-night-muted"><CalendarCheck className="size-4 text-mint-bright" aria-hidden />Peribahasa Hari Ini</p>
-              <span className={`rounded-full px-2.5 py-0.5 text-[0.75rem] font-[700] ${daily?.status === 'won' ? 'bg-mint-bright/20 text-mint-bright' : daily?.status === 'lost' ? 'bg-on-night/10 text-on-night-muted' : 'bg-sun/20 text-sun'}`}>
-                {daily?.status === 'won' ? 'Selesai' : daily?.status === 'lost' ? 'Cuba esok' : 'Belum dicuba'}
-              </span>
+          <section aria-labelledby="harian" className="on-night relative overflow-hidden rounded-[26px] bg-night p-5 text-on-night shadow-[0_6px_0_var(--color-night-raised)] sm:p-6">
+            <Stars />
+            <div className="relative flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.875rem] font-[850] text-on-night-muted">Cabaran harian</p>
+                <h2 id="harian" className="mt-1 text-[1.5rem] font-[900] leading-tight">Peribahasa Hari Ini</h2>
+                <p className="mt-1 text-[0.9375rem] font-[650] text-on-night-muted">{dailyDone ? (daily.status === 'won' ? `Jawapan: ${dailyRecord.peribahasa}` : 'Cuba lagi esok!') : 'Teka peribahasa daripada maksudnya. Empat cubaan.'}</p>
+              </div>
+              <Mascot mood={dailyDone ? (daily.status === 'won' ? 'cheer' : 'encourage') : 'think'} idle className="size-20 shrink-0" />
             </div>
-            <h2 id="harian" className="mt-3 text-[1.375rem] font-[720] leading-tight">
-              {daily && daily.status !== 'playing' ? dailyRecord.peribahasa : 'Teka peribahasa daripada maksudnya'}
-            </h2>
-            <div className="mt-4 flex gap-1.5" aria-label={`${daily?.guesses.length ?? 0} daripada 4 cubaan digunakan`}>
-              {Array.from({ length: 4 }).map((_, i) => {
-                const used = i < (daily?.guesses.length ?? 0);
-                const winning = daily?.status === 'won' && i === daily.guesses.length - 1;
-                return <span key={i} className={`h-2 flex-1 rounded-full ${winning ? 'bg-mint-bright' : used ? 'bg-on-night-muted/60' : 'bg-night-raised'}`} />;
-              })}
-            </div>
-            <Link to="/harian" className="btn btn-sun mt-5 w-full">{daily && daily.status !== 'playing' ? 'Lihat jawapan' : 'Main sekarang'}</Link>
+            <span className={`relative mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.875rem] font-[900] ${dailyDone ? 'bg-mint-soft text-mint' : 'bg-sun text-ink'}`}>
+              {dailyDone ? <Trophy className="size-4" aria-hidden /> : <Gift className="size-4" aria-hidden />}
+              {dailyDone ? `+${daily.xp} XP diperoleh` : 'Ganjaran sehingga +30 XP'}
+            </span>
+            <Link to="/harian" className="btn btn-sky relative mt-4 w-full">{dailyDone ? 'Lihat jawapan' : 'Main sekarang'}</Link>
           </section>
 
-          {/* Quick access */}
-          <section aria-labelledby="pantas">
-            <SectionTitle id="pantas">Akses pantas</SectionTitle>
-            <Link to="/cari" className="field flex items-center gap-3 text-ink-subtle no-underline">
-              <Search className="size-5" aria-hidden /> Cari peribahasa atau situasi…
-            </Link>
-            <ul className="mt-3 space-y-2">
-              {[
-                { to: '/kuiz/emoji', icon: Smile, label: 'Teka Emoji' },
-                { to: '/kuiz/kosong', icon: TextCursorInput, label: 'Isi Tempat Kosong' },
-                { to: '/kuiz/konteks', icon: MessagesSquare, label: 'Pilih Peribahasa yang Sesuai' },
-              ].map(({ to, icon: Icon, label }) => (
-                <li key={to}>
-                  <Link to={to} className="card card-link flex min-h-14 items-center gap-3 px-4 no-underline">
-                    <Icon className="size-5 text-primary" strokeWidth={2} aria-hidden />
-                    <span className="flex-1 font-[650]">{label}</span>
-                    <ArrowRight className="size-4 text-ink-subtle" aria-hidden />
+          {/* Activities */}
+          <section aria-labelledby="aktiviti">
+            <h2 id="aktiviti" className="mb-3 text-[1.375rem] font-[900]">Aktiviti pantas</h2>
+            <ul className="grid grid-cols-2 gap-3">
+              {ACTIVITIES.map(({ to, icon: Icon, title, text, tone }) => (
+                <li key={to} className="h-tile">
+                  <Link to={to} className={`flex h-full min-h-[118px] flex-col rounded-[18px] border-2 border-[var(--tile-edge)] p-3.5 no-underline shadow-[0_4px_0_var(--tile-edge)] transition-transform duration-150 active:translate-y-[4px] active:shadow-none ${TONE[tone]}`}>
+                    <span className={`grid size-10 place-items-center rounded-[12px] ${ICON_TONE[tone]}`}><Icon className="size-5" strokeWidth={2.6} aria-hidden /></span>
+                    <span className="mt-2 text-[1rem] font-[900] leading-tight text-ink">{title}</span>
+                    <span className="mt-0.5 text-[0.8125rem] font-[700]">{text}</span>
+                    {to.startsWith('/kad') && queues.due.length > 0 && <span className="mt-1 text-[0.75rem] font-[900] text-coral">{queues.due.length} kad menunggu</span>}
                   </Link>
                 </li>
               ))}
             </ul>
-            {state.favourites.length > 0 && (
-              <Link to="/profil#kegemaran" className="btn btn-quiet mt-3 -ml-3"><Bookmark className="size-4" aria-hidden />{state.favourites.length} peribahasa disimpan</Link>
-            )}
+          </section>
+
+          {/* Progress, compact */}
+          <section aria-labelledby="kemajuan" className="card border-b-4 p-4">
+            <div className="flex items-center justify-between">
+              <h2 id="kemajuan" className="text-[1.125rem] font-[900]">Kemajuan kamu</h2>
+              <Link to="/profil" className="btn btn-quiet btn-sm -mr-2">Profil</Link>
+            </div>
+            <dl className="mt-2 grid grid-cols-4 gap-2 text-center">
+              {[
+                { icon: <Flame className={`size-6 ${streak ? 'text-casque' : 'text-ink-subtle'}`} aria-hidden />, v: streak, l: 'streak' },
+                { icon: <Sparkles className="size-6 text-sun-edge" aria-hidden />, v: xpShown, l: 'XP' },
+                { icon: <Star className="size-6 text-lavender" aria-hidden />, v: mastered, l: 'dikuasai' },
+                { icon: <BookOpenCheck className="size-6 text-primary" aria-hidden />, v: lessonsDone, l: 'pelajaran' },
+              ].map((x) => (
+                <div key={x.l} className="flex flex-col items-center rounded-[14px] bg-surface-sunk py-2.5">
+                  {x.icon}
+                  <dd className="tnum m-0 mt-1 text-[1.25rem] font-[900] leading-none">{x.v}</dd>
+                  <dt className="mt-1 text-[0.75rem] font-[750] text-ink-muted">{x.l}</dt>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          {/* Achievements */}
+          <section aria-labelledby="lencana">
+            <div className="mb-3 flex items-end justify-between">
+              <h2 id="lencana" className="text-[1.375rem] font-[900]">Lencana seterusnya</h2>
+              <Link to="/profil#pencapaian" className="btn btn-quiet btn-sm">Semua</Link>
+            </div>
+            <ul className="space-y-2.5">
+              {nextBadges.map(({ a, got, v }) => (
+                <li key={a.id} className="flex items-center gap-3 rounded-[16px] border-2 border-line bg-surface p-3">
+                  <AchievementBadge id={a.id} unlocked={got} className="size-12" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-[900]">{a.title}</p>
+                    <p className="text-[0.8125rem] font-[650] text-ink-muted">{a.rule}</p>
+                    {!got && <div className="mt-1.5 flex items-center gap-2"><ProgressBar value={v} max={a.target} label={`${a.title}: ${v} daripada ${a.target}`} tone="sun" className="flex-1" /><span className="tnum text-[0.75rem] font-[850] text-ink-muted">{v}/{a.target}</span></div>}
+                    {got && <p className="text-[0.75rem] font-[900] text-mint">Dibuka</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         </aside>
       </div>
     </div>
+  );
+}
+
+function Sparkle({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`pointer-events-none absolute ${className}`} aria-hidden fill="currentColor">
+      <path d="M12 0l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" />
+    </svg>
+  );
+}
+
+export function Stars() {
+  const pts = [[8, 18], [22, 70], [40, 30], [64, 12], [78, 56], [90, 24], [54, 80], [14, 88]];
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full text-on-night" aria-hidden>
+      {pts.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 0.9 : 0.55} fill="currentColor" opacity={0.55} />)}
+    </svg>
   );
 }

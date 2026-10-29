@@ -266,9 +266,16 @@ function presentIn(text: string, needle: string): boolean {
   }
   return false;
 }
+// The PDF repeats a "PERIBAHASA MAKSUD" header at the top of each page; use it to record source pages.
+const pdfPages = raw('kamus-peribahasa-pdf').split(/^PERIBAHASA MAKSUD\s*$/m).map((t) => ' ' + normalize(t.replace(/\n/g, ' ')) + ' ');
 for (const r of records.values()) {
   for (const [sid, text] of Object.entries(presenceText)) {
     if (!r.sources.some((s) => s.id === sid) && presentIn(text, r.normalizedText)) r.sources.push({ id: sid });
+  }
+  const pdfRef = r.sources.find((s) => s.id === 'kamus-peribahasa-pdf');
+  if (pdfRef) {
+    const page = pdfPages.findIndex((t) => presentIn(t, r.normalizedText));
+    if (page >= 1) pdfRef.page = page; // chunk 0 is the title before the first page header
   }
 }
 

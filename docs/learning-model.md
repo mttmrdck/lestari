@@ -9,12 +9,25 @@ Everything here is implemented in `src/lib/` and covered by `src/test/learning.t
 | Correct quiz answer | 10 | once per question per session **and** once per saying, mode and day |
 | Correct answer in "Pilih Peribahasa" (context) | +5 bonus | same as above |
 | Completing a quiz session of 5+ questions | 10 | once per session id |
+| Passing a learning-path lesson (60%+) for the first time | 20 | once per lesson |
 | Flashcard review (any rating) | 3 | once per card per day |
 | Opening a saying for the first time | 1 | once per saying, at most 20 per day |
 | Daily challenge solved in 1/2/3/4 attempts | 30/25/20/15 | once per date |
 | Daily challenge attempted but not solved | 5 | once per date |
 
 Wrong answers, refreshing, re-opening cards and searching earn nothing. The daily goal (30, 50 or 80 XP) is the learner's choice.
+
+## Learning path
+
+7 units and 19 lessons (`src/lib/lessons.ts`). A lesson teaches 2–4 sayings, then practises them: one Teka Maksud per saying, up to two Lengkapkan, a Padankan Situasi and a Kuiz Emoji question when curated content exists, and one matching-pairs round (counts as correct with at most one wrong pairing). Passing needs 60%. Lessons unlock strictly in order; a locked lesson URL shows why it is locked.
+
+## Achievements
+
+Mula Melangkah (first lesson passed), Langkah Pertama (first quiz session), Konsisten! (7-day streak), Bijak Bahasa (25 mastered), Raja Peribahasa (100 mastered), Pencari Tegar (10 different situation searches), Pakar Emoji (15 correct), Mahir Konteks (20 correct situation answers), Penebak Harian (5 daily challenges), Ulang Kaji Rajin (50 flashcard reviews). All are computed from stored activity.
+
+## Mistakes list
+
+A saying is listed under Simpanan → Kesilapan when its latest quiz answer was wrong or it was saved for revision after a quiz. Dismissing it records the wrong-answer count at that moment; it returns only after a new wrong answer. Dismissing never changes mastery evidence.
 
 ## Streak
 

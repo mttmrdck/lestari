@@ -10,6 +10,8 @@ import { dateKey, formatDateMs } from '../../lib/date';
 import { normalize } from '../../lib/text';
 import { useDocumentTitle, useReducedMotion } from '../../hooks/media';
 import { Mascot } from '../../components/Mascot';
+import { fireConfetti } from '../../components/Celebrate';
+import { Stars } from '../home/HomeRoute';
 import { CategoryBadge } from '../../components/ui';
 
 const POOL = dailyPool(CORE);
@@ -53,7 +55,9 @@ export default function DailyPage() {
     if (guesses.some((x) => normalize(x) === normalize(g))) { setHint('Kamu sudah mencuba jawapan ini.'); return; }
     if (g.split(/\s+/).length < 2) { setHint('Taip peribahasa penuh, bukan satu perkataan.'); return; }
     setHint(null);
-    store.dailyGuess(today, answer.id, g, isCorrectGuess(answer, g, BY_ID), DAILY_ATTEMPTS);
+    const ok = isCorrectGuess(answer, g, BY_ID);
+    store.dailyGuess(today, answer.id, g, ok, DAILY_ATTEMPTS);
+    if (ok) fireConfetti();
     setGuess('');
   }
 
@@ -65,7 +69,8 @@ export default function DailyPage() {
       <h1 className="mt-1 text-[1.875rem] font-[740] leading-tight tracking-[-0.03em] sm:text-[2.25rem]">Peribahasa Hari Ini</h1>
       <p className="mt-1 text-ink-muted">Teka peribahasa daripada petunjuk. Setiap jawapan salah membuka petunjuk baharu. Semua pelajar mendapat peribahasa yang sama hari ini.</p>
 
-      <section className="on-night mt-6 rounded-[var(--radius-xl)] bg-night p-5 text-on-night sm:p-7">
+      <section className="on-night relative mt-6 overflow-hidden rounded-[var(--radius-xl)] bg-night p-5 text-on-night shadow-[0_6px_0_var(--color-night-raised)] sm:p-7">
+        <Stars />
         <div className="flex items-center justify-between gap-3">
           <p className="text-[0.875rem] font-[650] text-on-night-muted">Petunjuk</p>
           <div className="flex gap-1.5" aria-label={`${guesses.length} daripada ${DAILY_ATTEMPTS} cubaan digunakan`}>

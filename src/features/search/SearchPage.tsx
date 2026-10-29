@@ -101,6 +101,7 @@ function KeywordMode() {
   const browsing = !q && !category && !theme;
 
   const runChip = (word: string) => { setText(word); inputRef.current?.focus(); };
+  const voice = useVoiceInput((t) => setText(t.replace(/[.?!]+$/, '')));
   let shown = 0;
 
   return (
@@ -114,18 +115,26 @@ function KeywordMode() {
           type="search"
           enterKeyHint="search"
           autoComplete="off"
-          className="field min-h-14 pl-12 pr-12 text-[1.0625rem]"
+          className="field min-h-14 pl-12 pr-24 text-[1.0625rem]"
           placeholder="Cuba “padi”, “harimau” atau “ilmu”"
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        {text && (
-          <button type="button" onClick={() => { setText(''); inputRef.current?.focus(); }} className="absolute right-2 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full text-ink-muted hover:bg-surface-sunk" aria-label="Kosongkan carian">
-            <X className="size-5" aria-hidden />
-          </button>
-        )}
+        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+          {text && (
+            <button type="button" onClick={() => { setText(''); inputRef.current?.focus(); }} className="grid size-10 place-items-center rounded-full text-ink-muted hover:bg-surface-sunk" aria-label="Kosongkan carian">
+              <X className="size-5" aria-hidden />
+            </button>
+          )}
+          {voice.supported && (
+            <button type="button" onClick={voice.listening ? voice.stop : voice.start} aria-pressed={voice.listening} className={`grid size-10 place-items-center rounded-full ${voice.listening ? 'bg-coral text-surface' : 'text-ink-muted hover:bg-surface-sunk'}`} aria-label={voice.listening ? 'Henti input suara' : 'Cari dengan suara'}>
+              {voice.listening ? <MicOff className="size-5" aria-hidden /> : <Mic className="size-5" aria-hidden />}
+            </button>
+          )}
+        </div>
       </form>
 
+      {voice.error && <p className="mt-2 text-[0.875rem] font-[700] text-coral" role="alert">{voice.error}</p>}
       {wordSuggestions.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Cadangan perkataan">
           <span className="text-[0.8125rem] font-[600] text-ink-muted">Cadangan:</span>

@@ -1,16 +1,30 @@
-// Bayu, the LESTARI guide: an original hornbill (enggang) drawn in SVG.
+// Bayu, the LESTARI guide: an original rhinoceros hornbill (enggang) drawn in SVG.
+// A small set of expressions reused across the app; `idle` adds a gentle float and blink.
 // Groups carry class names so GSAP timelines can move the wing, head and casque.
-export type Mood = 'happy' | 'cheer' | 'think' | 'read';
+export type Mood = 'happy' | 'cheer' | 'think' | 'read' | 'encourage' | 'wave' | 'wow';
 
 interface Props {
   mood?: Mood;
   className?: string;
   /** Leave empty when the mascot is decorative next to text that says the same thing. */
   label?: string;
+  /** Gentle float and blink. Disabled automatically under prefers-reduced-motion (global CSS). */
+  idle?: boolean;
 }
 
-export function Mascot({ mood = 'happy', className, label }: Props) {
+const BODY = '#263238';
+const WING = '#34454D';
+const BELLY = '#FFFDF5';
+const BEAK = '#FFC800';
+const BEAK_LOW = '#F0A500';
+const CASQUE = '#FF8A3D';
+const SCARF = '#58CC02';
+const SCARF_EDGE = '#46A302';
+
+export function Mascot({ mood = 'happy', className, label, idle = false }: Props) {
   const decorative = !label;
+  const beakOpen = mood === 'cheer' || mood === 'wow' || mood === 'wave';
+  const wingUp = mood === 'cheer' || mood === 'wave';
   return (
     <svg
       viewBox="0 0 220 220"
@@ -20,67 +34,96 @@ export function Mascot({ mood = 'happy', className, label }: Props) {
       aria-label={label}
       focusable="false"
     >
-      {/* tail */}
-      <path className="bayu-tail" d="M70 176c-14 12-24 24-30 36l20-4c8-10 16-20 22-28z" fill="#2E2858" />
-      <path d="M40 212l20-4c-2 3-4 6-7 8z" fill="#FFF6E6" />
-      {/* feet */}
-      <g fill="#F2762E">
-        <rect x="88" y="190" width="14" height="12" rx="6" />
-        <rect x="114" y="190" width="14" height="12" rx="6" />
-      </g>
-      {/* body */}
-      <g className="bayu-body">
-        <path d="M108 72c40 0 54 40 52 72-2 34-24 52-52 52s-50-18-52-52c-2-32 12-72 52-72z" fill="#1E1A3C" />
-        <path d="M108 112c24 0 33 20 32 38-1 22-14 36-32 36s-31-14-32-36c-1-18 8-38 32-38z" fill="#FFF6E6" />
-        {/* songket scarf */}
-        <path d="M74 104c22 12 46 12 68 0l3 13c-23 12-51 12-74 0z" fill="#5B3FD8" />
-        <path d="M128 112l14 26-15-4-6-18z" fill="#4A30BF" />
-        <g fill="#FFC845">
-          <circle cx="88" cy="111" r="2" />
-          <circle cx="101" cy="114" r="2" />
-          <circle cx="114" cy="114" r="2" />
-          <circle cx="127" cy="111" r="2" />
+      <ellipse cx="110" cy="208" rx="46" ry="7" fill="#263238" opacity="0.12" />
+      <g className={idle ? 'float' : undefined} style={{ transformBox: 'view-box', transformOrigin: '110px 200px' }}>
+        {/* tail with white band */}
+        <path d="M70 172c-14 12-24 24-30 36l22-4c8-10 16-20 22-28z" fill={WING} />
+        <path d="M40 208l22-4c-2 3-4 6-7 8z" fill={BELLY} />
+        {/* feet */}
+        <g fill={CASQUE}>
+          <rect x="88" y="188" width="15" height="12" rx="6" />
+          <rect x="114" y="188" width="15" height="12" rx="6" />
         </g>
-      </g>
-      {/* wing */}
-      <g className="bayu-wing" style={{ transformOrigin: '84px 128px', transformBox: 'view-box' }}>
-        {mood === 'cheer' ? (
-          <path d="M80 126c-20-10-30-30-26-50 14 6 26 18 34 34z" fill="#2E2858" />
-        ) : (
-          <path d="M66 128c-14 20-8 44 12 50-2-20 2-36 12-46z" fill="#2E2858" />
-        )}
-      </g>
-      {mood === 'read' && (
-        <g className="bayu-book">
-          <path d="M80 150l28 8 28-8v30l-28 8-28-8z" fill="#FFFDF8" stroke="#D3C6AC" strokeWidth="2" strokeLinejoin="round" />
-          <path d="M108 158v30" stroke="#D3C6AC" strokeWidth="2" />
-          <path d="M88 160l14 4M88 168l14 4M114 164l14-4M114 172l14-4" stroke="#5B3FD8" strokeWidth="2" strokeLinecap="round" />
+        {/* body */}
+        <g className="bayu-body">
+          <path d="M108 70c42 0 56 42 54 74-2 34-24 52-54 52s-52-18-54-52c-2-32 12-74 54-74z" fill={BODY} />
+          <path d="M108 112c25 0 34 20 33 38-1 22-14 36-33 36s-32-14-33-36c-1-18 8-38 33-38z" fill={BELLY} />
+          {/* songket scarf */}
+          <path d="M72 102c23 13 49 13 72 0l3 14c-24 13-54 13-78 0z" fill={SCARF} />
+          <path d="M72 109c23 13 49 13 72 0l2 7c-24 13-54 13-77 0z" fill={SCARF_EDGE} />
+          <path d="M128 112l15 27-16-4-6-18z" fill={SCARF_EDGE} />
+          <g fill={BEAK}>
+            {[86, 100, 114, 128].map((x) => <path key={x} d={`M${x} 109l3 3-3 3-3-3z`} />)}
+          </g>
         </g>
-      )}
-      {/* head */}
-      <g className="bayu-head" style={{ transformOrigin: '110px 96px', transformBox: 'view-box' }}>
-        <circle cx="106" cy="70" r="38" fill="#1E1A3C" />
-        {/* casque */}
-        <path className="bayu-casque" d="M124 46c18-16 50-12 64 12-16-4-38-5-58 2z" fill="#F2762E" />
-        <path d="M134 44c10-5 24-4 34 2" stroke="#FFB27A" strokeWidth="4" strokeLinecap="round" fill="none" />
-        {/* beak */}
-        <path d="M134 58c26-4 56 10 68 40-22-10-46-14-70-10z" fill="#FFC845" />
-        <path d="M134 86c22-2 44 2 66 11-20 1-44 1-68-2z" fill="#E8A92A" />
-        {/* eye */}
-        {mood === 'think' ? (
-          <>
-            <circle cx="114" cy="64" r="12" fill="#FFFDF8" />
-            <path d="M102 62a12 12 0 0 1 24 0z" fill="#1E1A3C" />
-            <circle cx="117" cy="67" r="5" fill="#1E1A3C" />
-          </>
-        ) : (
-          <>
-            <circle cx="114" cy="64" r="12" fill="#FFFDF8" />
-            <circle className="bayu-pupil" cx="117" cy="65" r="6.5" fill="#1E1A3C" />
-            <circle cx="119.5" cy="62" r="2.2" fill="#FFFDF8" />
-          </>
+        {/* wing */}
+        <g className="bayu-wing" style={{ transformOrigin: '84px 126px', transformBox: 'view-box' }}>
+          {wingUp ? (
+            <path d="M80 124c-22-8-34-30-30-52 16 6 28 20 36 36z" fill={WING} />
+          ) : mood === 'think' ? (
+            <path d="M70 126c-10 14-4 30 12 34 10-6 18-14 22-24-12 0-24-4-34-10z" fill={WING} />
+          ) : (
+            <path d="M64 126c-14 20-8 44 12 50-2-20 2-36 12-46z" fill={WING} />
+          )}
+        </g>
+        {mood === 'read' && (
+          <g className="bayu-book">
+            <path d="M80 148l28 8 28-8v30l-28 8-28-8z" fill="#FFFFFF" stroke="#D9D2BE" strokeWidth="2.5" strokeLinejoin="round" />
+            <path d="M108 156v30" stroke="#D9D2BE" strokeWidth="2.5" />
+            <path d="M88 158l14 4M88 166l14 4M114 162l14-4M114 170l14-4" stroke={SCARF_EDGE} strokeWidth="2.5" strokeLinecap="round" />
+          </g>
         )}
-        <ellipse cx="96" cy="86" rx="8" ry="4.5" fill="#FF9A8B" opacity="0.5" />
+        {mood === 'encourage' && (
+          <path d="M150 128c10-6 20-4 24 4l-8 10c-6-4-12-4-18 0z" fill={WING} />
+        )}
+        {/* head */}
+        <g className="bayu-head" style={{ transformOrigin: '110px 96px', transformBox: 'view-box' }}>
+          <circle cx="106" cy="68" r="39" fill={BODY} />
+          {/* casque */}
+          <path className="bayu-casque" d="M122 44c19-17 53-13 68 13-17-5-40-6-61 2z" fill={CASQUE} />
+          <path d="M133 42c11-5 26-4 36 2" stroke="#FFC29A" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+          {/* beak */}
+          <path d="M133 57c27-4 58 10 70 40-23-10-48-14-72-10z" fill={BEAK} />
+          <g style={{ transformOrigin: '134px 86px', transformBox: 'view-box', transform: beakOpen ? 'rotate(12deg)' : undefined }}>
+            <path d="M133 85c23-2 46 2 68 11-21 1-46 1-70-2z" fill={BEAK_LOW} />
+          </g>
+          {beakOpen && <path d="M136 88c10 4 20 6 30 6-10 4-22 4-30 0z" fill="#E05555" />}
+          {/* eye */}
+          <g className={idle ? 'bayu-blink' : undefined}>
+            <circle cx="114" cy="63" r="12.5" fill="#FFFFFF" />
+            {mood === 'think' ? (
+              <>
+                <circle cx="119" cy="59" r="6" fill={BODY} />
+                <circle cx="121" cy="57" r="2" fill="#FFFFFF" />
+              </>
+            ) : mood === 'wow' ? (
+              <>
+                <circle cx="114" cy="63" r="7.5" fill={BODY} />
+                <circle cx="117" cy="60" r="2.6" fill="#FFFFFF" />
+              </>
+            ) : (
+              <>
+                <circle className="bayu-pupil" cx="117" cy="64" r="6.5" fill={BODY} />
+                <circle cx="119.5" cy="61" r="2.3" fill="#FFFFFF" />
+              </>
+            )}
+            {mood === 'happy' || mood === 'cheer' || mood === 'wave' ? (
+              <path d="M101 70c8 6 19 6 26 0" stroke={BODY} strokeWidth="5" fill="none" strokeLinecap="round" />
+            ) : null}
+          </g>
+          {/* brows carry the emotion */}
+          {mood === 'encourage' && <path d="M101 45c8-6 18-6 25 0" stroke="#FFC29A" strokeWidth="4" fill="none" strokeLinecap="round" />}
+          {mood === 'think' && <path d="M103 46l22-5" stroke="#FFC29A" strokeWidth="4" strokeLinecap="round" />}
+          {mood === 'wow' && <path d="M102 44c7-8 19-8 25 0" stroke="#FFC29A" strokeWidth="4" fill="none" strokeLinecap="round" />}
+          <ellipse cx="96" cy="85" rx="8.5" ry="5" fill="#FF8E8E" opacity="0.55" />
+        </g>
+        {mood === 'cheer' && (
+          <g fill={BEAK}>
+            <path d="M40 40l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" />
+            <path d="M182 120l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
+            <path d="M58 98l2 4 4 2-4 2-2 4-2-4-4-2 4-2z" />
+          </g>
+        )}
       </g>
     </svg>
   );
@@ -89,11 +132,12 @@ export function Mascot({ mood = 'happy', className, label }: Props) {
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 40 40" className={className} aria-hidden="true" focusable="false">
-      <rect width="40" height="40" rx="11" fill="#5B3FD8" />
-      <circle cx="16" cy="22" r="9" fill="#1E1A3C" />
-      <path d="M21 15c5-5 13-4 16 2-4-1-9-1-14 1z" fill="#F2762E" />
-      <path d="M23 18c6-1 12 2 14 8-5-2-10-3-15-2z" fill="#FFC845" />
-      <circle cx="18" cy="20" r="2.4" fill="#FFFDF8" />
+      <rect width="40" height="40" rx="12" fill="#58CC02" />
+      <rect y="34" width="40" height="6" rx="3" fill="#46A302" />
+      <circle cx="16" cy="21" r="9" fill="#263238" />
+      <path d="M21 14c5-5 13-4 16 2-4-1-9-1-14 1z" fill="#FF8A3D" />
+      <path d="M23 17c6-1 12 2 14 8-5-2-10-3-15-2z" fill="#FFC800" />
+      <circle cx="18" cy="19" r="2.6" fill="#FFFFFF" />
     </svg>
   );
 }
@@ -101,8 +145,8 @@ export function LogoMark({ className }: { className?: string }) {
 export function Wordmark({ className = '' }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <LogoMark className="size-8 shrink-0" />
-      <span className="font-display text-[1.375rem] font-[760] leading-none tracking-[-0.03em] text-ink">lestari</span>
+      <LogoMark className="size-9 shrink-0" />
+      <span className="font-display text-[1.5rem] font-[900] leading-none tracking-[-0.02em] text-primary-ink">lestari</span>
     </span>
   );
 }

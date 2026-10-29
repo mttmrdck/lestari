@@ -39,6 +39,8 @@ export interface SourceRef {
   tingkatan?: string;
   url?: string;
   note?: string;
+  /** Page in the supplied PDF where the entry appears. */
+  page?: number;
 }
 
 export interface ContohAyat {
