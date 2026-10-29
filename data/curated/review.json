@@ -1,0 +1,147 @@
+{
+  "_readme": "Reviewer decisions applied by scripts/import-peribahasa.ts. sensitive: searchable but kept out of quizzes, flashcards and daily picks. flags: meaning or wording that a teacher should check against Kamus Istimewa Peribahasa Melayu (DBP). corrections: spelling fixes applied to meanings; the original text is kept in maksudAsal.",
+  "sensitive": [
+    "ibu-ayam",
+    "janda-berhias",
+    "jangan-bagai-babi-merasa-gulai",
+    "jangan-berkemudi-di-haluan",
+    "jinak-jinak-merpati",
+    "kaki-botol",
+    "kaki-judi",
+    "gila-judi",
+    "ladang-yang-berpunya",
+    "laksana-cempedak-mambung-pulur-saja-jual-tak-laku",
+    "mata-keranjang",
+    "hidung-belang",
+    "orang-dapur",
+    "bagai-gagak-menggonggong-telur",
+    "di-mana-makan-di-situ-berak",
+    "kepala-tersangkut-dengan-kulit-babi",
+    "bagai-anjing-beranak-enam",
+    "kain-dalam-lipatan",
+    "rumah-buruk-disapu-cat",
+    "elok-arak-di-hari-panas",
+    "gajah-berak-besar-kancil-pun-hendak-berak-besar-juga",
+    "campak-bunga-dibalas-dengan-campak-tahi",
+    "ayam-terlepas-tangan-bau-tahi",
+    "setengah-tiang"
+  ],
+  "flags": {
+    "ingin-di-buah-manggis-hutan-masak-ranum-tergantung-tinggi": "Maksud dalam sumber (“sudah diperoleh”) bercanggah dengan gambaran buah yang tergantung tinggi; kemungkinan maksud sebenar ialah sesuatu yang sukar diperoleh.",
+    "air-besar-sampan-tak-hanyut": "Maksud dalam sumber (“Maksud tiada mencapai”) kabur dan perlu disemak.",
+    "ayam-baru-belajar-berkokok": "Maksud dalam sumber (“Saja cukup umur”) tidak lengkap.",
+    "hari-ini-sedang-panas-panjang-kacang-telah-lupakan-kulitnya": "Bentuk peribahasa ini luar biasa; semak bentuk baku dalam kamus.",
+    "naga-ditelan-ular-lidi": "Maksud dalam sumber perlu disemak; peribahasa yang hampir sama, “Gajah ditelan ular lidi”, mempunyai maksud yang berlainan.",
+    "bagai-ayam-mengeram-telur": "Maksud dalam sumber tidak jelas kaitannya dengan gambaran ayam mengeram.",
+    "nasi-masak-periuk-pecah": "Maksud dalam sumber (“Keputusan yang akhir”) perlu disemak.",
+    "untung-bagai-untung-kapas": "Maksud dalam sumber mengandungi kesilapan ejaan dan tidak jelas.",
+    "jadi-alas-cakap": "Maksud dalam sumber (“Hadiah kepada orang yang merit”) tidak jelas.",
+    "entimun-bongkok": "Maksud dalam sumber tidak jelas.",
+    "bagai-anjing-tersepit-di-pagar": "Maksud dalam sumber tidak sepadan dengan gambaran peribahasa.",
+    "tak-lapik-dek-hujan-tak-lekang-dek-panas": "Kemungkinan salah ejaan bagi “Tak lapuk dek hujan, tak lekang dek panas”.",
+    "lepas-tangan": "Maksud lazim ialah tidak mahu bertanggungjawab; maksud dalam sumber (“Tidak menyukai campur tangan”) perlu disemak.",
+    "kebenaran-di-hujung-lidah": "Maksud dalam sumber (“Tiada keadilan”) perlu disemak.",
+    "air-didih-menganak-sungai": "Maksud dalam sumber (“Hiburan yang amat mewah”) perlu disemak.",
+    "naik-pitam": "Maksud lazim ialah terlalu marah; sumber menyatakan “Pening”.",
+    "gaya-saja-rasanya-wallah": "Bentuk peribahasa ini luar biasa; semak bentuk baku dalam kamus.",
+    "geleng-seperti-si-patung-kenyang": "Bentuk dan maksud perlu disemak."
+  },
+  "corrections": [
+    [
+      "yg",
+      "yang"
+    ],
+    [
+      "dgn",
+      "dengan"
+    ],
+    [
+      "bialah",
+      "biarlah"
+    ],
+    [
+      "perkerjaan",
+      "pekerjaan"
+    ],
+    [
+      "yand",
+      "yang"
+    ],
+    [
+      "berkerja",
+      "bekerja"
+    ],
+    [
+      "menggangu",
+      "mengganggu"
+    ],
+    [
+      "dengil",
+      "degil"
+    ],
+    [
+      "bersugguh",
+      "bersungguh"
+    ],
+    [
+      "sehinggamemperoleh",
+      "sehingga memperoleh"
+    ],
+    [
+      "mampuan",
+      "kemampuan"
+    ],
+    [
+      "Berbahayakan",
+      "Membahayakan"
+    ]
+  ],
+  "prpm": {
+    "sebab-nila-setitik-rosak-susu-sebelanga": {
+      "url": "https://prpm.dbp.gov.my/Cari1?keyword=nila",
+      "note": "PRPM menyenaraikan “Sebab nila setitik, rosak susu [= santan] sebelanga” sebagai peribahasa yang sama makna dengan “Ikan sekambu rosak oleh ikan seekor”.",
+      "exact": true
+    },
+    "ikan-sekambu-rosak-oleh-ikan-seekor": {
+      "url": "https://prpm.dbp.gov.my/Cari1?keyword=nila",
+      "note": "PRPM: “Ikan sekambu rosak oleh ikan seekor. Bermaksud: Kerana yang sedikit rosak yang banyak.”",
+      "exact": true
+    },
+    "sediakan-payung-sebelum-hujan": {
+      "url": "https://prpm.dbp.gov.my/Cari1?keyword=payung",
+      "note": "PRPM (Peribahasa dan Ungkapan Inggeris–Melayu): padanan “Dig a well before it rains”, bermaksud buat persediaan sebelum terlambat.",
+      "exact": true
+    },
+    "sepandai-pandai-tupai-melompat-akhirnya-jatuh-ke-tanah-juga": {
+      "url": "https://prpm.dbp.gov.my/Cari1?keyword=sepandai-pandai",
+      "note": "Bentuk dalam Kamus Dewan Edisi Keempat: “Sepandai-pandai tupai melompat, sekali gawal [= terjatuh] juga”.",
+      "exact": false
+    },
+    "seperti-aur-dengan-tebing": {
+      "url": "https://prpm.dbp.gov.my/Cari1?keyword=aur",
+      "note": "PRPM merujuk bentuk “Sebagai aur dengan tebing” (bandingkan “Bagai aur bergantung ke tebing, bagai tebing bergantung ke aur”: satu sama lain bertolong-tolongan).",
+      "exact": false
+    },
+    "ke-bukit-sama-didaki-ke-lurah-sama-dituruni": {
+      "url": "https://prpm.dbp.gov.my/Cari1?keyword=bukit",
+      "note": "PRPM merekodkan “Bukit sama didaki, lurah sama dituruni” bermaksud persahabatan yang sangat karib.",
+      "exact": false
+    }
+  },
+  "notVariants": [
+    [
+      "bagai-buah-jatuh-ke-riba",
+      "bagai-bulan-jatuh-ke-riba"
+    ],
+    [
+      "gajah-ditelan-ular-lidi",
+      "naga-ditelan-ular-lidi"
+    ]
+  ],
+  "forceVariants": [
+    [
+      "ketam-menyuruhkan-anaknya-berjalan-betul",
+      "seperti-ketam-mengajar-anak-berjalan-lurus"
+    ]
+  ]
+}

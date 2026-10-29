@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "name": "LESTARI — Hutan & Hikayat",
+    "source": "Derived from the brief's written descriptions of three reference apps (no image files were supplied) and adapted into an original identity. Format: zanwei/design-dna schema.",
+    "references_described": [
+      "Playful learning app: colourful 3D characters, rounded progress cards, purple accents, engaging welcome screen",
+      "Clean educational mobile app: discovery cards, progress indicators, subject tiles, bottom navigation",
+      "Dark gamified app: dark backgrounds, bright green progress, streaks, challenges, achievements"
+    ],
+    "extracted_principles": [
+      "One clear primary action per screen, in a single saturated accent",
+      "Chunky, friendly, pressable controls with generous touch targets",
+      "Progress expressed as real numbers and short bars, never decoration",
+      "A dark 'challenge' surface with a bright green indicator for the daily game",
+      "A character guide that appears at moments of welcome, emptiness and celebration"
+    ],
+    "deliberately_not_taken": ["third-party mascots or branding", "3D rendered characters (cost and performance)", "full dark theme"]
+  },
+  "design_system": {
+    "color": {
+      "ground": "#FBF6EC", "surface": "#FFFDF8", "ink": "#1E1A3C", "action": "#5B3FD8",
+      "correct": "#157A55", "progress_fill": "#2BB673", "reward": "#FFC845", "error": "#A8352B", "challenge_surface": "#17142F",
+      "rule": "Colour carries meaning (action, correct, wrong, reward); chrome stays paper and ink."
+    },
+    "typography": {
+      "display": "Bricolage Grotesque 680–760", "ui_body": "Plus Jakarta Sans 450–700, 16px minimum", "sayings": "Fraunces (SOFT axis) for every peribahasa",
+      "scale_px": [13, 14, 15, 16, 18, 22, 28, 36, 52, 80, 96]
+    },
+    "spacing": { "base": 4, "group_gap": "8–12px", "section_gap": "32–48px" },
+    "layout": { "mobile": "16px gutters, bottom 5-tab bar", "desktop": "248px sidebar, 1080px content cap, 2:1 main/aside" },
+    "shape": { "control": 12, "card": 18, "panel": 26, "chip": "pill" },
+    "elevation": { "rest": "1px warm line", "lift": "0 14px 34px -14px ink/28%", "button": "3px inner bottom edge (pressable key)" },
+    "iconography": { "library": "Lucide", "stroke": "1.75–2.2", "emoji": "quiz content only" },
+    "motion": { "ease_out": "cubic-bezier(0.23,1,0.32,1)", "ease_in_out": "cubic-bezier(0.77,0,0.175,1)", "press": "120ms", "panel": "240ms", "flip": "460ms" },
+    "components": ["button (primary/secondary/quiet/sun)", "chip", "segmented control", "peribahasa row", "flip card", "quiz option", "night panel", "toast", "sheet"]
+  },
+  "design_style": {
+    "aesthetic": "Warm manuscript paper meets rainforest play: literary serif sayings on a modern, tactile app",
+    "visual_language": "Flat surfaces, warm rules, one violet, a hornbill guide",
+    "composition": "Type-led stats instead of tiles; one dominant block per screen; the dark challenge panel as the counterweight",
+    "imagery": "Original SVG mascot (Bayu the hornbill) and simple canopy silhouettes; no stock images",
+    "interaction_feel": "Pressable, quick, forgiving; feedback is immediate and encouraging",
+    "brand_voice_in_ui": "Friendly Bahasa Melayu, second person (kamu), never shaming: 'Hampir tepat! Cuba fahami maksudnya sekali lagi.'"
+  },
+  "visual_effects": {
+    "overview": "Restrained. One authored moment per screen; everything respects prefers-reduced-motion.",
+    "background_effects": "none",
+    "particle_systems": "React Bits ClickSpark bursts on correct answers and saves (canvas over real HTML controls)",
+    "3d_elements": "CSS 3D flip on flashcards only; no WebGL",
+    "shader_effects": "none",
+    "scroll_effects": { "parallax": "none", "scroll_triggered_animations": "none", "scroll_morphing": "none" },
+    "text_effects": "GSAP staggered line entrance on the welcome tagline; GSAP count-up on quiz scores",
+    "cursor_effects": "none",
+    "image_effects": "none",
+    "glassmorphism_neumorphism": "none (removed after Hallmark sloplint flagged header blur)",
+    "canvas_drawings": "ClickSpark only",
+    "svg_animations": "GSAP timeline moves Bayu's head and wing on welcome and achievement moments",
+    "composite_notes": "Evaluated and declined: Scroll World (needs paid Higgsfield video generation), Canvas UI and Three.js scenes (GPU cost on student devices for little learning value)."
+  }
+}

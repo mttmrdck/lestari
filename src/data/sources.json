@@ -1,0 +1,43 @@
+[
+  {
+    "id": "kompilasi-320",
+    "title": "Kompilasi Lengkap Peribahasa Melayu",
+    "file": "320 peribahasa.docx",
+    "origin": "Dokumen dibekalkan; kompilasi daripada beberapa rujukan, disusun mengikut abjad",
+    "kind": "dibekalkan"
+  },
+  {
+    "id": "kamus-peribahasa-pdf",
+    "title": "Senarai Peribahasa – Kamus Peribahasa Melayu dan Maksud",
+    "file": "Senarai Peribahasa – Kamus Peribahasa Melayu dan Maksud.pdf",
+    "origin": "Dokumen dibekalkan; tertera hak cipta senaraiperibahasa.com",
+    "kind": "dibekalkan"
+  },
+  {
+    "id": "senarai-spm",
+    "title": "Senarai Peribahasa SPM (Tingkatan 1 hingga 5)",
+    "file": "Senarai_Peribahasa_SPM.docx",
+    "origin": "Dokumen dibekalkan; disusun mengikut tingkatan",
+    "kind": "dibekalkan"
+  },
+  {
+    "id": "senarai-t1-t3",
+    "title": "Senarai Peribahasa (Tingkatan 1 hingga Tingkatan 3)",
+    "file": "pdf-senarai-peribahasa.docx",
+    "origin": "Dokumen dibekalkan; contoh daripada buku teks Tingkatan 1 hingga 3",
+    "kind": "dibekalkan"
+  },
+  {
+    "id": "seratus-peribahasa",
+    "title": "100 Peribahasa Melayu dan Ertinya",
+    "file": "pdf-100-peribahasa-melayu-dan-maknanya.docx",
+    "origin": "Dokumen dibekalkan",
+    "kind": "dibekalkan"
+  },
+  {
+    "id": "prpm",
+    "title": "Pusat Rujukan Persuratan Melayu (PRPM), Dewan Bahasa dan Pustaka",
+    "origin": "https://prpm.dbp.gov.my — petikan Kamus Dewan Edisi Keempat dan data peribahasa PRPM",
+    "kind": "rujukan-luar"
+  }
+]
