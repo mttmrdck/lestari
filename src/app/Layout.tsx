@@ -1,6 +1,6 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, ScrollRestoration, Link } from 'react-router';
-import { Home, Search, Puzzle, Bookmark, UserRound, Flame, CalendarCheck, Map, Layers, X, Sparkles, Trophy } from 'lucide-react';
+import { Home, Search, BookOpen, Bookmark, UserRound, Flame, CalendarCheck, Map, Layers, X, Sparkles, Trophy } from 'lucide-react';
 import { useProgress, useStorageNotice, useStore } from './store';
 import { useAuth } from './auth';
 import { currentStreak } from '../lib/progress';
@@ -13,17 +13,20 @@ import { ProgressBar } from '../components/ui';
 const NAV = [
   { to: '/', label: 'Utama', icon: Home, match: (p: string) => p === '/' || p.startsWith('/laluan') },
   { to: '/cari', label: 'Cari', icon: Search, match: (p: string) => p.startsWith('/cari') || p.startsWith('/peribahasa') },
-  { to: '/kuiz', label: 'Latihan', icon: Puzzle, match: (p: string) => p.startsWith('/kuiz') || p.startsWith('/kad-imbas') || p.startsWith('/harian') },
-  { to: '/simpanan', label: 'Simpanan', icon: Bookmark, match: (p: string) => p.startsWith('/simpanan') },
-  { to: '/profil', label: 'Profil', icon: UserRound, match: (p: string) => p.startsWith('/profil') || p.startsWith('/tentang') },
+  { to: '/kuiz', label: 'Belajar', icon: BookOpen, match: (p: string) => ['/kuiz', '/kad-imbas', '/harian', '/simpanan'].some((x) => p.startsWith(x)) },
+  { to: '/papan-juara', label: 'Juara', icon: Trophy, match: (p: string) => p.startsWith('/papan-juara') },
+  { to: '/profil', label: 'Profil', icon: UserRound, match: (p: string) => p.startsWith('/profil') || p.startsWith('/tentang') || p.startsWith('/akaun') },
 ];
 
 const EXTRA = [
-  { to: '/papan-juara', label: 'Papan Juara', icon: Trophy },
   { to: '/laluan', label: 'Laluan', icon: Map },
   { to: '/harian', label: 'Peribahasa Hari Ini', icon: CalendarCheck },
   { to: '/kad-imbas', label: 'Kad Imbas', icon: Layers },
+  { to: '/simpanan', label: 'Simpanan', icon: Bookmark },
 ];
+
+/** Tabs that keep their place: coming back to Cari or Juara restores the search or period. */
+const REMEMBERED_TABS = ['/cari', '/papan-juara'];
 
 /** Sign-in screens are full-page: no sidebar or tab bar competes with the form. */
 const AUTH_PATHS = ['/masuk', '/daftar', '/lupa-kata-laluan'];
@@ -57,7 +60,8 @@ function XpChip({ xp }: { xp: number }) {
 }
 
 export function Layout() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const [remembered, setRemembered] = useState<Record<string, string>>({});
   const hasProfile = useProgress((s) => !!s.profile);
   const storageNotice = useStorageNotice();
   const store = useStore();
@@ -69,6 +73,12 @@ export function Layout() {
   const focused = pathname.startsWith('/pelajaran/');
   const activeIndex = NAV.findIndex((n) => n.match(pathname));
   const active = Math.max(0, activeIndex);
+  useEffect(() => {
+    const tab = REMEMBERED_TABS.find((t) => pathname === t);
+    if (tab) setRemembered((r) => (r[tab] === search ? r : { ...r, [tab]: search }));
+  }, [pathname, search]);
+  /** Tapping a tab returns to where you left it; tapping the tab you are on goes to its top. */
+  const hrefFor = (to: string, isActive: boolean) => (isActive ? to : to + (remembered[to] ?? ''));
 
   if (bare) {
     return (
@@ -93,7 +103,7 @@ export function Layout() {
           <nav aria-label="Navigasi utama" className="relative mt-8 flex flex-col gap-1.5">
             <span aria-hidden className="absolute inset-x-0 top-0 h-12 rounded-[14px] border-2 border-sky bg-sky-soft transition-[transform,opacity] duration-300 ease-[var(--ease-spring)]" style={{ transform: `translateY(${active * 54}px)`, opacity: activeIndex >= 0 ? 1 : 0 }} />
             {NAV.map(({ to, label, icon: Icon }, i) => (
-              <Link key={to} to={to} aria-current={i === activeIndex ? 'page' : undefined} className={`relative flex h-12 items-center gap-3 rounded-[14px] px-3 text-[1rem] font-[850] no-underline transition-colors duration-150 ${i === activeIndex ? 'text-sky-ink' : 'text-ink-muted hover:text-ink'}`}>
+              <Link key={to} to={hrefFor(to, i === activeIndex)} aria-current={i === activeIndex ? 'page' : undefined} className={`relative flex h-12 items-center gap-3 rounded-[14px] px-3 text-[1rem] font-[850] no-underline transition-colors duration-150 ${i === activeIndex ? 'text-sky-ink' : 'text-ink-muted hover:text-ink'}`}>
                 <Icon className="size-[22px]" strokeWidth={2.4} aria-hidden />
                 {label}
               </Link>
@@ -123,7 +133,6 @@ export function Layout() {
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b-2 border-line bg-paper px-4 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))] lg:hidden">
             <Link to="/" className="no-underline" aria-label="LESTARI, laman utama"><Wordmark /></Link>
             <div className="flex items-center gap-2">
-              <Link to="/papan-juara" aria-label="Papan Juara" className="grid size-[34px] place-items-center rounded-full bg-lavender-soft text-lavender-ink no-underline"><Trophy className="size-[18px]" strokeWidth={2.6} aria-hidden /></Link>
               <StreakChip streak={streak} />
               <XpChip xp={xpTotal} />
             </div>
@@ -142,14 +151,14 @@ export function Layout() {
       </div>
 
       {!focused && (
-        <nav aria-label="Navigasi utama" className="fixed inset-x-0 bottom-0 z-40 border-t-2 border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
+        <nav aria-label="Navigasi utama" className="tabbar fixed inset-x-0 bottom-0 z-40 border-t-2 border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
           <ul className="relative mx-auto grid max-w-[560px] grid-cols-5">
             <li aria-hidden className="pointer-events-none absolute top-1.5 h-[34px] w-1/5 px-3 transition-[transform,opacity] duration-300 ease-[var(--ease-spring)]" style={{ transform: `translateX(${active * 100}%)`, opacity: activeIndex >= 0 ? 1 : 0 }}>
               <span className="block h-full rounded-full border-2 border-sky bg-sky-soft" />
             </li>
             {NAV.map(({ to, label, icon: Icon }, i) => (
               <li key={to} className="relative">
-                <Link to={to} aria-current={i === activeIndex ? 'page' : undefined} className={`flex min-h-[66px] flex-col items-center justify-center gap-1 pt-1 text-[0.75rem] font-[850] no-underline transition-colors duration-150 ${i === activeIndex ? 'text-sky-ink' : 'text-ink-subtle hover:text-ink'}`}>
+                <Link to={hrefFor(to, i === activeIndex)} aria-current={i === activeIndex ? 'page' : undefined} className={`flex min-h-[66px] flex-col items-center justify-center gap-1 pt-1 text-[0.75rem] font-[850] no-underline transition-colors duration-150 ${i === activeIndex ? 'text-sky-ink' : 'text-ink-subtle hover:text-ink'}`}>
                   <Icon className={`size-[22px] transition-transform duration-300 ease-[var(--ease-spring)] ${i === activeIndex ? 'scale-110' : ''}`} strokeWidth={i === activeIndex ? 2.6 : 2.2} aria-hidden />
                   {label}
                 </Link>

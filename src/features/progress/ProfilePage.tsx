@@ -12,6 +12,7 @@ import { useDocumentTitle } from '../../hooks/media';
 import { PeribahasaRow, ProgressBar, SectionTitle, EmptyState, Sheet } from '../../components/ui';
 import { Mascot } from '../../components/Mascot';
 import { Onboarding } from '../home/Onboarding';
+import { InstallCard } from './InstallCard';
 
 const DAY_SHORT = ['Ahd', 'Isn', 'Sel', 'Rab', 'Kha', 'Jum', 'Sab'];
 
@@ -62,6 +63,8 @@ export default function ProfilePage() {
           <span className="min-w-0"><span className="block font-[800]">{user ? 'Akaun kamu' : 'Log masuk'}</span><span className="block text-[0.8125rem] text-ink-muted">{user ? 'Kata laluan, log keluar dan pemadaman akaun' : 'Simpan kemajuan dan masuk Papan Juara'}</span></span>
         </Link>
       </div>
+
+      <InstallCard />
 
       <SectionTitle>Kemajuan</SectionTitle>
       <dl className="card grid grid-cols-2 gap-x-6 gap-y-6 p-5 sm:grid-cols-3 sm:p-6 lg:grid-cols-6">

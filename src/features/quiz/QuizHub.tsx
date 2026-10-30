@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { ArrowRight, Timer, BookOpenCheck, TextCursorInput, MessagesSquare, Smile, Layers, CalendarCheck } from 'lucide-react';
+import { ArrowRight, Timer, BookOpenCheck, TextCursorInput, MessagesSquare, Smile, Layers, CalendarCheck, Map, Bookmark } from 'lucide-react';
 import { useProgress, useStore } from '../../app/store';
 import { MODE_LABEL } from '../../lib/progress';
 import { formatDateMs } from '../../lib/date';
@@ -19,7 +19,7 @@ const MODES = [
 ];
 
 export default function QuizHub() {
-  useDocumentTitle('Latihan');
+  useDocumentTitle('Belajar');
   const store = useStore();
   const timer = useProgress((s) => s.settings.timer);
   const history = useProgress((s) => s.quizHistory);
@@ -28,13 +28,18 @@ export default function QuizHub() {
     <div>
       <div className="flex items-end gap-4">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[2rem] font-[900] leading-tight">Latihan</h1>
+          <h1 className="text-[2rem] font-[900] leading-tight">Belajar</h1>
           <p className="mt-1 max-w-[56ch] font-[650] text-ink-muted">Pilih cara berlatih. Setiap kuiz ada 8 soalan, bermula dengan yang mudah.</p>
         </div>
         <Mascot mood="cheer" idle className="hidden size-24 shrink-0 sm:block" />
       </div>
 
-      <ul className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Link to="/laluan" className="card card-link flex min-h-14 items-center gap-2.5 px-3.5 py-2 font-[850] no-underline"><Map className="size-5 shrink-0 text-primary-ink" strokeWidth={2.6} aria-hidden />Laluan</Link>
+        <Link to="/simpanan" className="card card-link flex min-h-14 items-center gap-2.5 px-3.5 py-2 font-[850] no-underline"><Bookmark className="size-5 shrink-0 text-sky-ink" strokeWidth={2.6} aria-hidden />Simpanan</Link>
+      </div>
+
+      <ul className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {MODES.map(({ to, icon: Icon, title, text, sample, cls, icon_cls, timer: hasTimer }) => (
           <li key={to} className={`flex flex-col rounded-[22px] border-2 p-5 shadow-[0_5px_0_var(--edge)] ${cls}`}>
             <div className="flex items-center gap-3">

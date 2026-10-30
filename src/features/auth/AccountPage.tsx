@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
-import { KeyRound, LogOut, Trash2, Trophy } from 'lucide-react';
+import { KeyRound, LogOut, ShieldCheck, Trash2, Trophy } from 'lucide-react';
 import { useAuth } from '../../app/auth';
 import { PageSkeleton } from '../../app/Layout';
 import { api, ApiError } from '../../lib/api';
@@ -8,6 +8,7 @@ import { validPassword } from '../../lib/account';
 import { Sheet } from '../../components/ui';
 import { useDocumentTitle } from '../../hooks/media';
 import { Field, FormError, Spinner } from './AuthShell';
+import { RecoveryCode } from './RecoveryCode';
 import { Avatar } from '../leaderboard/Avatar';
 
 export default function AccountPage() {
@@ -22,6 +23,10 @@ export default function AccountPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [newCode, setNewCode] = useState<string | null>(null);
 
   if (auth.status === 'loading') return <PageSkeleton />;
   if (!auth.user) return <Navigate to="/masuk?ke=/akaun" replace />;
@@ -47,6 +52,17 @@ export default function AccountPage() {
     setLeaving(true);
     await auth.logout();
     navigate('/', { replace: true });
+  }
+
+  async function replaceCode() {
+    setRecoveryError(null);
+    try {
+      const r = await api.newRecoveryCode(recoveryPassword);
+      setNewCode(r.recoveryCode);
+      setRecoveryPassword('');
+    } catch (err) {
+      setRecoveryError(err instanceof ApiError ? err.message : 'Ada masalah. Cuba lagi.');
+    }
   }
 
   async function remove() {
@@ -85,6 +101,10 @@ export default function AccountPage() {
       </section>
 
       <div className="card mt-3 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div><p className="font-[800]">Kod pemulihan</p><p className="text-[0.875rem] text-ink-muted">Kod lama tidak boleh dilihat semula. Jika hilang, cipta kod baharu; kod lama terus tidak sah.</p></div>
+        <button type="button" className="btn btn-secondary btn-sm shrink-0" onClick={() => { setNewCode(null); setRecoveryOpen(true); }}><ShieldCheck className="size-4" aria-hidden />Kod Baharu</button>
+      </div>
+      <div className="card mt-3 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div><p className="font-[800]">Log keluar</p><p className="text-[0.875rem] text-ink-muted">Kemajuan kamu disimpan dalam akaun.</p></div>
         <button type="button" disabled={leaving} className="btn btn-secondary btn-sm" onClick={logout}>{leaving ? <Spinner /> : <LogOut className="size-4" aria-hidden />}Log Keluar</button>
       </div>
@@ -92,6 +112,19 @@ export default function AccountPage() {
         <div><p className="font-[800]">Padam akaun</p><p className="text-[0.875rem] text-ink-muted">Akaun, XP dan kedudukan kamu dipadam untuk selama-lamanya.</p></div>
         <button type="button" className="btn btn-secondary btn-sm text-coral" onClick={() => setConfirmDelete(true)}><Trash2 className="size-4" aria-hidden />Padam Akaun</button>
       </div>
+
+      <Sheet open={recoveryOpen} onClose={() => setRecoveryOpen(false)} title="Kod pemulihan baharu">
+        {newCode ? <RecoveryCode code={newCode} onDone={() => setRecoveryOpen(false)} /> : (
+          <>
+            <p className="text-ink-muted">Masukkan kata laluan untuk mencipta kod baharu.</p>
+            <div className="mt-4 space-y-3">
+              {recoveryError && <FormError>{recoveryError}</FormError>}
+              <Field id="kod-kata-laluan" label="Kata laluan" icon={KeyRound} type="password" autoComplete="current-password" value={recoveryPassword} onChange={(e) => setRecoveryPassword(e.target.value)} />
+            </div>
+            <button type="button" disabled={!recoveryPassword} className="btn btn-primary mt-5 w-full" onClick={replaceCode}>Cipta Kod</button>
+          </>
+        )}
+      </Sheet>
 
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Padam akaun ini?">
         <p className="text-ink-muted">Tindakan ini tidak boleh dibatalkan. Masukkan kata laluan untuk mengesahkan.</p>

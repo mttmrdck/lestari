@@ -32,3 +32,10 @@ All 17 repositories were verified to exist (GitHub API, 29 Oct 2026), shallow-cl
 - **taste-skill inspect --app** on Latihan: fixed "covered text" (the confetti canvas now mounts only while falling). Remaining findings (emoji content, tactile bottom shadows, coloured icon blocks, cream ground) are direct requirements of this brief and were kept deliberately.
 - **Emil Kowalski / motion-design / GSAP**: easing tokens plus a spring for the nav indicator, press feedback at 110ms, the gentle 2.4s node pulse instead of flashing, entrance timelines scoped with `useGSAP`, everything off under reduced motion.
 - **React Bits ClickSpark** on correct answers and saves; confetti is a small in-house canvas (no extra animation library).
+
+## Added later
+
+| Resource | Status | How it was used |
+|---|---|---|
+| supabase/agent-skills | Installed with `npx skills add supabase/agent-skills -a claude-code --copy` (pinned in `skills-lock.json`) | `supabase` skill read and followed: changelog check, key handling, RLS rules recorded in `docs/supabase.md`. `supabase-postgres-best-practices` not needed, because no tables were created. |
+| pbakaus/impeccable | `reference/adapt.md` and `craft-floor.md` read | Guided the mobile pass: bottom sheets, thumb zone, hover only behind `hover: hover`, touch checks with real touch events. Its launcher downloads a binary, so it still was not run. |

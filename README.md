@@ -39,4 +39,4 @@ Guest progress stays in this browser. Signed-in progress syncs to the account.
 
 ## Docs
 
-`DESIGN.md` (design system) · `AGENTS.md` (conventions, commands) · `docs/learning-model.md` · `docs/situation-search-evaluation.md` · `docs/deployment.md` · `docs/supabase.md` · `docs/content-review-notes.md` · `docs/data-quality-report.md` · `docs/design-resources.md` · `docs/design-dna.json`
+`DESIGN.md` (design system) · `AGENTS.md` (conventions, commands) · `docs/learning-model.md` · `docs/situation-search-evaluation.md` · `docs/deployment.md` · `docs/supabase.md` · `docs/security.md` · `docs/content-review-notes.md` · `docs/data-quality-report.md` · `docs/design-resources.md` · `docs/design-dna.json`

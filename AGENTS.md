@@ -12,9 +12,10 @@ LESTARI is a mobile-first React app for learning Malay peribahasa, served by a C
 | Serve the build as a guest-only static site | `npm run preview` (http://localhost:4173) |
 | Serve the build with the API and local D1 | `npm run db:migrate:local`, then `npm run dev:api` (http://localhost:8787) |
 | Unit and integration tests (data, search, learning logic, Worker against real SQLite) | `npm test` |
-| Browser checks (needs `npm run dev:api` running on a fresh local database and Chrome, Brave or Edge installed; `CHROME_PATH` overrides) | `npm run e2e` |
+| Browser checks, including axe accessibility, touch, PWA and offline (needs `npm run dev:api` running on a fresh local database and Chrome, Brave or Edge installed; `CHROME_PATH` overrides) | `npm run e2e` |
 | Measure situation search; `-- --report` rewrites the report | `npm run eval:situasi` |
 | Re-embed the example situations (after editing `data/curated/situations.json`) | `npm run data:embed` |
+| Check a live deployment with a throwaway account | `node scripts/verify-live.mjs <url>` |
 | Check the Supabase connection | `npm run supabase:check` |
 | Deploy (after reading `docs/deployment.md`) | `npm run deploy` |
 | Lint | `npm run lint` |
@@ -70,4 +71,4 @@ docs/                    data-quality report, learning model, design DNA, resour
 
 ## Testing expectations
 
-Before finishing a change: `npm test`, `npm run build`, and, for UI changes, `npm run dev:api` plus `npm run e2e`, then look at the screenshots in `e2e-shots/` at 375, 430, 768 and 1440px.
+Before finishing a change: `npm test`, `npm run build`, and, for UI changes, `npm run dev:api` plus `npm run e2e`, then look at the screenshots in `e2e-shots/` at 360, 375, 390, 430, 768 and 1440px. Touch and layout checks run in Chromium emulation; they do not replace a real phone.

@@ -1,7 +1,9 @@
 // Post-deploy check against a real URL. Creates one throwaway account and deletes it at the end.
 //   node scripts/verify-live.mjs https://lestari.zafranakif74.workers.dev
 import { chromium } from 'playwright-core';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const BASE = process.argv[2] ?? 'https://lestari.zafranakif74.workers.dev';
 const DATA = JSON.parse(readFileSync(new URL('../src/data/peribahasa.json', import.meta.url), 'utf8'));
@@ -41,6 +43,27 @@ for (const [q, want] of [
 await page.goto(`${BASE}/cari?mode=situasi&q=${encodeURIComponent('Saya membeli sebotol air di kedai runcit.')}`);
 await page.getByTestId('tiada-padanan').waitFor();
 check('situasi: no match stays honest', (await page.locator('article').count()) === 0);
+
+const health = await page.evaluate(() => fetch('/api/supabase/status').then((r) => r.json()));
+check('Supabase reachable from the Worker', health.configured && health.reachable, JSON.stringify(health));
+await page.goto(BASE + '/');
+await page.evaluate(() => navigator.serviceWorker.ready);
+await page.waitForTimeout(1000);
+await page.reload();
+await page.waitForTimeout(1000);
+check('service worker active', await page.evaluate(() => !!navigator.serviceWorker.controller));
+// Chromium refuses to install from an incognito-like context, so this one check needs a real profile.
+const profile = mkdtempSync(join(tmpdir(), 'lestari-pwa-'));
+const installCtx = await chromium.launchPersistentContext(profile, { executablePath, headless: true, viewport: { width: 390, height: 844 } });
+const installPage = await installCtx.newPage();
+await installPage.goto(BASE + '/');
+await installPage.evaluate(() => navigator.serviceWorker.ready);
+await installPage.reload();
+await installPage.waitForTimeout(1000);
+const install = await (await installCtx.newCDPSession(installPage)).send('Page.getInstallabilityErrors');
+check('installable, per the browser', install.installabilityErrors.length === 0, JSON.stringify(install.installabilityErrors));
+await installCtx.close();
+rmSync(profile, { recursive: true, force: true });
 
 await page.goto(BASE + '/daftar');
 await page.getByLabel('Nama paparan').fill('Ujian Automatik');

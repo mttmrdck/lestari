@@ -2,7 +2,9 @@
 //   node scripts/e2e.mjs [baseUrl] [shotsDir]
 // Set CHROME_PATH to use a specific browser; otherwise common macOS paths are tried.
 import { chromium } from 'playwright-core';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const DATA = JSON.parse(readFileSync(new URL('../src/data/peribahasa.json', import.meta.url), 'utf8'));
 const norm = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -226,8 +228,11 @@ const settle = (page) => page.waitForTimeout(900);
   await page.goto(BASE + '/simpanan');
   await page.getByRole('radio', { name: /Kesilapan/ }).click();
   check('mistakes tab lists wrong answers', (await page.locator('a[href^="/peribahasa/"]').count()) > 0);
+  // Simpanan is part of the Belajar tab, so start from a route that belongs to another tab.
+  await page.goto(BASE + '/cari');
+  await settle(page);
   const navBefore = await page.locator('nav[aria-label="Navigasi utama"] li[aria-hidden]').last().getAttribute('style');
-  await page.getByRole('navigation', { name: 'Navigasi utama' }).last().getByRole('link', { name: 'Latihan' }).click();
+  await page.getByRole('navigation', { name: 'Navigasi utama' }).last().getByRole('link', { name: 'Belajar' }).click();
   await page.waitForTimeout(400);
   const navAfter = await page.locator('nav[aria-label="Navigasi utama"] li[aria-hidden]').last().getAttribute('style');
   check('bottom nav indicator moves with the route', navBefore !== navAfter, `${navBefore} -> ${navAfter}`);
@@ -474,6 +479,98 @@ const settle = (page) => page.waitForTimeout(900);
   { const kept = errors.filter((e) => !/ERR_FAILED|Failed to fetch/.test(e)); errors.length = 0; errors.push(...kept); }
 }
 
+
+// ---------- 1e. Mobile app behaviour ----------
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(`mobile: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error' && !/status of 4(01|09)|ERR_INTERNET_DISCONNECTED|Failed to fetch/.test(m.text())) errors.push(`mobile console: ${m.text()}`); });
+  await page.goto(BASE + '/');
+  await page.evaluate(() => localStorage.setItem('lestari:v1', JSON.stringify({ version: 1, profile: { name: 'Aina', level: 'menengah', dailyGoal: 50, createdAt: 1 } })));
+  await page.goto(BASE + '/');
+  await settle(page);
+  const tabbar = page.getByRole('navigation', { name: 'Navigasi utama' }).last();
+  const tabs = await tabbar.getByRole('link').allInnerTexts();
+  check('bottom bar has the five tabs in order', tabs.join() === 'Utama,Cari,Belajar,Juara,Profil', tabs.join());
+  const small = await tabbar.getByRole('link').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.height < 44 || r.width < 44; }).length);
+  check('tab targets are at least 44px', small === 0);
+  await tabbar.getByRole('link', { name: 'Cari' }).tap();
+  await page.getByRole('button', { name: 'Pilih tema' }).tap();
+  const dialog = page.getByRole('dialog', { name: 'Pilih tema' });
+  await dialog.waitFor();
+  await page.waitForTimeout(400);
+  const box = await dialog.boundingBox();
+  check('theme picker is a bottom sheet', Math.round(box.y + box.height) === 844 && box.width === 390, JSON.stringify(box));
+  await page.screenshot({ path: `${SHOTS}/flow-17-sheet.png` });
+  await dialog.getByRole('button', { name: /Keluarga/ }).tap();
+  await page.getByTestId('bilangan-hasil').waitFor();
+  check('choosing in the sheet filters', page.url().includes('tema=keluarga'));
+  await tabbar.getByRole('link', { name: 'Juara' }).tap();
+  await page.getByRole('heading', { name: 'Papan Juara' }).waitFor();
+  check('switching tabs does not reload the page', await page.evaluate(() => performance.getEntriesByType('navigation').length === 1 && !!document.querySelector('.tabbar')));
+  await tabbar.getByRole('link', { name: 'Cari' }).tap();
+  await page.getByTestId('bilangan-hasil').waitFor({ timeout: 3000 }).catch(() => {});
+  check('Cari keeps its filter when you come back', page.url().includes('tema=keluarga'), page.url());
+  await page.getByLabel('Kata kunci peribahasa').tap();
+  await page.waitForTimeout(200);
+  check('the tab bar steps aside for the keyboard', !(await tabbar.isVisible()));
+  await page.evaluate(() => document.activeElement.blur());
+
+  // Swipe with real touch events, through the browser protocol.
+  await page.goto(BASE + '/kad-imbas');
+  await settle(page);
+  await page.getByRole('button', { name: /Mula sesi/ }).tap();
+  await page.getByRole('button', { name: 'Tunjuk maksud' }).tap();
+  await page.waitForTimeout(600);
+  check('swipe is explained and buttons remain', await page.getByText(/Leret kanan/).isVisible() && await page.getByRole('button', { name: /^Mudah/ }).isVisible());
+  const cdp = await ctx.newCDPSession(page);
+  const touch = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y: 340 }] });
+  const swipe = async (from, to) => { await touch('touchStart', from); for (let i = 1; i <= 6; i++) { await touch('touchMove', from + ((to - from) * i) / 6); await page.waitForTimeout(16); } await touch('touchEnd', to); await page.waitForTimeout(300); };
+  const cards = () => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('lestari:v1')).cards ?? {}).length);
+  await swipe(150, 190);
+  check('a short swipe rates nothing', (await cards()) === 0);
+  await swipe(100, 320);
+  check('a long swipe right rates the card', (await cards()) === 1 && (await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('lestari:v1')).cards)[0].interval)) === 4);
+
+  // PWA
+  const manifest = await page.evaluate(() => fetch('/manifest.webmanifest').then((r) => r.json()));
+  check('manifest is complete', manifest.display === 'standalone' && manifest.short_name === 'LESTARI' && manifest.icons.some((i) => i.purpose === 'maskable'));
+  for (const i of manifest.icons) check(`icon ${i.src}`, (await page.evaluate((u) => fetch(u).then((r) => r.ok && r.headers.get('content-type').startsWith('image/png')), i.src)));
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.waitForTimeout(800);
+  await page.reload();
+  await settle(page);
+  check('service worker is active', await page.evaluate(() => !!navigator.serviceWorker.controller));
+  // Chromium refuses to install from an incognito-like context, so this one check needs a real profile.
+  const profile = mkdtempSync(join(tmpdir(), 'lestari-pwa-'));
+  const installCtx = await chromium.launchPersistentContext(profile, { executablePath, headless: true, viewport: { width: 390, height: 844 } });
+  const installPage = await installCtx.newPage();
+  await installPage.goto(BASE + '/');
+  await installPage.evaluate(() => navigator.serviceWorker.ready);
+  await installPage.reload();
+  await settle(installPage);
+  const installCdp = await installCtx.newCDPSession(installPage);
+  const errs = await installCdp.send('Page.getInstallabilityErrors');
+  check('browser reports no installability errors', errs.installabilityErrors.length === 0, JSON.stringify(errs.installabilityErrors));
+  await installCtx.close();
+  rmSync(profile, { recursive: true, force: true });
+  const cached = await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async (k) => (await (await caches.open(k)).keys()).map((r) => new URL(r.url).pathname)))).flat());
+  check('nothing private is cached', cached.length > 5 && !cached.some((u) => u.startsWith('/api/')), `${cached.length} entries`);
+  const headers = await page.evaluate(() => fetch('/').then((r) => Object.fromEntries(r.headers)));
+  check('security headers are served', /frame-ancestors 'none'/.test(headers['content-security-policy'] ?? '') && headers['x-content-type-options'] === 'nosniff');
+  await ctx.setOffline(true);
+  await page.goto(BASE + '/cari?tema=keluarga').catch(() => {});
+  await page.getByTestId('bilangan-hasil').waitFor({ timeout: 6000 }).catch(() => {});
+  check('offline: the app and its peribahasa still open', await page.getByTestId('bilangan-hasil').isVisible());
+  await page.goto(BASE + '/papan-juara').catch(() => {});
+  await page.getByText('Papan Juara tidak dapat dimuatkan.').waitFor({ timeout: 13000 }).catch(() => {});
+  check('offline: online-only screens say so', await page.getByText('Papan Juara tidak dapat dimuatkan.').isVisible());
+  await ctx.setOffline(false);
+  await ctx.close();
+  { const kept = errors.filter((e) => !/ERR_INTERNET_DISCONNECTED|ERR_FAILED|Failed to fetch|Failed to load resource/.test(e)); errors.length = 0; errors.push(...kept); }
+}
+
 // ---------- Reduced motion ----------
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
@@ -488,8 +585,10 @@ const settle = (page) => page.waitForTimeout(900);
 }
 
 // ---------- 2. Layout at four widths ----------
-const ROUTES = ['/masuk', '/daftar', '/lupa-kata-laluan', '/papan-juara', '/', '/laluan', '/simpanan', '/pelajaran/asas-1', '/cari', '/cari?mode=kata&q=ayam', '/cari?mode=situasi&q=Semua%20ahli%20kelas%20bergotong-royong%20membersihkan%20kelas%20bersama-sama.', '/peribahasa/sudah-terantuk-baru-tengadah', '/kuiz', '/kuiz/emoji', '/kad-imbas', '/profil', '/harian', '/tentang'];
-for (const vp of [{ width: 375, height: 812 }, { width: 430, height: 932 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
+const ROUTES = ['/papan-juara?tempoh=semua', '/masuk', '/daftar', '/lupa-kata-laluan', '/papan-juara', '/', '/laluan', '/simpanan', '/pelajaran/asas-1', '/cari', '/cari?mode=kata&q=ayam', '/cari?mode=situasi&q=Semua%20ahli%20kelas%20bergotong-royong%20membersihkan%20kelas%20bersama-sama.', '/peribahasa/sudah-terantuk-baru-tengadah', '/kuiz', '/kuiz/emoji', '/kad-imbas', '/profil', '/harian', '/tentang'];
+const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
+const axeFindings = new Map();
+for (const vp of [{ width: 360, height: 740 }, { width: 375, height: 812 }, { width: 390, height: 844 }, { width: 430, height: 932 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
   const { ctx, page } = await newPage(vp);
   // Seed a profile so routes render the app shell; welcome is captured separately.
   await page.goto(BASE + '/');
@@ -499,6 +598,13 @@ for (const vp of [{ width: 375, height: 812 }, { width: 430, height: 932 }, { wi
     await settle(page);
     const o = await overflow(page);
     check(`no horizontal overflow ${vp.width}px ${r}`, o <= 0, o > 0 ? `${o}px` : '');
+    if (vp.width === 390 || vp.width === 1440) {
+      // Entrance animations fade text in; contrast is only meaningful once they have finished.
+      await page.waitForTimeout(1800);
+      await page.evaluate(AXE);
+      const found = await page.evaluate(async () => (await window.axe.run(document, { resultTypes: ['violations'], runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa'] })).violations.filter((v) => ['serious', 'critical'].includes(v.impact)).map((v) => `${v.id}: ${v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(', ')}`));
+      for (const f of found) axeFindings.set(`${vp.width} ${r} ${f}`, true);
+    }
     const name = r.replace(/[/?=&%]+/g, '_').slice(0, 40) || 'home';
     await page.screenshot({ path: `${SHOTS}/w${vp.width}${name}.png`, fullPage: true });
   }
@@ -509,6 +615,8 @@ for (const vp of [{ width: 375, height: 812 }, { width: 430, height: 932 }, { wi
   check(`welcome headline and action above the fold at ${vp.width}px`, await page.getByRole('button', { name: 'Mula Belajar' }).first().isVisible());
   await ctx.close();
 }
+
+check('no serious accessibility violations', axeFindings.size === 0, [...axeFindings.keys()].slice(0, 12).join(' | '));
 
 await browser.close();
 check('no runtime errors', errors.length === 0, errors.slice(0, 5).join(' | '));

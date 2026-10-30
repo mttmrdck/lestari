@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import './hooks/install';
 import './index.css';
 import { StoreProvider } from './app/store';
 import { AuthProvider } from './app/auth';
@@ -56,6 +57,11 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
+// Production only: a service worker in dev would serve stale modules.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js'); });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -92,11 +92,13 @@
     overflow-x: clip;
   }
   html {
+    -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
     scrollbar-color: var(--color-line-strong) transparent;
   }
   body {
     margin: 0;
+    overscroll-behavior-y: none;
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
@@ -126,6 +128,12 @@
   a {
     color: inherit;
     text-underline-offset: 3px;
+  }
+  button,
+  a,
+  label,
+  summary {
+    touch-action: manipulation;
   }
   button {
     font: inherit;
@@ -203,8 +211,10 @@
     background: var(--color-primary);
     color: var(--color-on-primary);
   }
+  @media (hover: hover) {
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-strong);
+      background: var(--color-primary-strong);
+    }
   }
   .btn-secondary {
     --edge: var(--color-line-strong);
@@ -212,8 +222,10 @@
     color: var(--color-sky-ink);
     border-color: var(--color-line-strong);
   }
+  @media (hover: hover) {
   .btn-secondary:hover:not(:disabled) {
-    background: var(--color-sky-soft);
+      background: var(--color-sky-soft);
+    }
   }
   .btn-sun {
     --edge: var(--color-sun-edge);
@@ -232,8 +244,10 @@
     padding: 0 0.75rem;
     box-shadow: none;
   }
+  @media (hover: hover) {
   .btn-quiet:hover:not(:disabled) {
-    background: var(--color-primary-soft);
+      background: var(--color-primary-soft);
+    }
   }
   .btn-quiet:active:not(:disabled) {
     transform: scale(0.97);
@@ -264,8 +278,10 @@
       color 160ms ease,
       transform 120ms var(--ease-out);
   }
+  @media (hover: hover) {
   .chip:hover {
-    background: var(--color-sky-soft);
+      background: var(--color-sky-soft);
+    }
   }
   .chip:active {
     transform: scale(0.96);
@@ -336,6 +352,10 @@
   }
 
   /* Flashcard flip */
+  .swipe-card {
+    touch-action: pan-y;
+    transition: transform 220ms var(--ease-out);
+  }
   .flip {
     perspective: 1400px;
   }
@@ -355,6 +375,37 @@
     position: absolute;
     inset: 0;
     transform: rotateY(180deg);
+  }
+
+  /* Phones: a true bottom sheet that rises from the thumb zone and clears the home indicator. */
+  .sheet {
+    max-height: 88dvh;
+    overflow: hidden;
+    animation: sheet-up 280ms var(--ease-out) both;
+  }
+  .sheet:not([open]) {
+    display: none;
+  }
+  .sheet[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+  @media (min-width: 640px) {
+    .sheet {
+      animation-name: rise-in;
+    }
+  }
+  /* The keyboard takes the bottom of the screen; bars pinned there would cover the field being typed in. */
+  @media (pointer: coarse) {
+    body:has(input:not([type='checkbox']):focus, textarea:focus) .tabbar,
+    body:has(input:not([type='checkbox']):focus, textarea:focus) .you-bar {
+      display: none;
+    }
   }
 
   .page-enter {
@@ -401,6 +452,11 @@
   }
 }
 
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);

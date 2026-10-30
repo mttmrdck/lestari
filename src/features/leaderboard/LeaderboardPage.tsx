@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { ChevronDown, ChevronUp, Crown, Info, LogIn, Medal, Minus, RotateCw, Sparkles, UsersRound } from 'lucide-react';
@@ -29,7 +29,10 @@ const rankKey = (t: Tempoh) => `lestari:kedudukan:${t}`;
 export default function LeaderboardPage() {
   useDocumentTitle('Papan Juara');
   const { user, status } = useAuth();
-  const [tempoh, setTempoh] = useState<Tempoh>('minggu');
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('tempoh');
+  const tempoh: Tempoh = TEMPOH.find((t) => t.value === asked)?.value ?? 'minggu';
+  const setTempoh = (t: Tempoh) => setParams(t === 'minggu' ? {} : { tempoh: t }, { replace: true });
   const [demo, setDemo] = useState<'auto' | '0' | '1'>('auto');
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [failed, setFailed] = useState(false);
@@ -241,11 +244,11 @@ function Move({ move }: { move: number | null }) {
 function Row({ e }: { e: LeaderEntry }) {
   const xp = useCountUp(e.xp, 800, 0);
   return (
-    <li data-key={e.key} data-you={e.you || undefined} className={`r-row flex items-center gap-3 rounded-[var(--radius-lg)] border-2 p-2.5 sm:px-4 ${e.you ? 'row-you border-sky bg-sky-soft' : 'border-line bg-surface'}`}>
+    <li data-key={e.key} data-you={e.you || undefined} className={`r-row flex items-center gap-2 rounded-[var(--radius-lg)] border-2 p-2.5 sm:gap-3 sm:px-4 ${e.you ? 'row-you border-sky bg-sky-soft' : 'border-line bg-surface'}`}>
       <span className="tnum w-7 shrink-0 text-center text-[1.0625rem] font-[900] text-ink-muted">{e.rank}</span>
       <Avatar name={e.name} seed={e.key} />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-[850]">{e.name}</p>
+        <p className="line-clamp-2 font-[850] leading-snug break-words">{e.name}</p>
         <p className="flex items-center gap-1.5 text-[0.8125rem] text-ink-subtle">
           {e.you && <span className="shrink-0 rounded-full bg-sky px-1.5 text-[0.6875rem] font-[900] text-on-sky">Kamu</span>}
           {e.demo && <span className="shrink-0 rounded-full border border-line-strong px-1.5 text-[0.6875rem] font-[800] text-ink-muted">Demo</span>}
@@ -264,7 +267,7 @@ function Row({ e }: { e: LeaderEntry }) {
  */
 function YouBar({ you }: { you: LeaderEntry }) {
   return createPortal(
-    <aside aria-label="Kedudukan Kamu" data-testid="kedudukan-kamu" className="fixed inset-x-0 bottom-[calc(69px+env(safe-area-inset-bottom))] z-30 px-4 lg:bottom-4 lg:left-[248px]">
+    <aside aria-label="Kedudukan Kamu" data-testid="kedudukan-kamu" className="you-bar fixed inset-x-0 bottom-[calc(69px+env(safe-area-inset-bottom))] z-30 px-4 lg:bottom-4 lg:left-[248px]">
       <div className="mx-auto flex max-w-[760px] items-center gap-3 rounded-[var(--radius-lg)] border-2 border-sky bg-sky-soft p-2.5 shadow-[var(--shadow-lift)] sm:px-4">
         <Medal className="size-6 shrink-0 text-sky-ink" aria-hidden />
         <div className="min-w-0 flex-1">

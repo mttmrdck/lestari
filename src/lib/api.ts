@@ -50,6 +50,7 @@ export const api = {
   recover: (b: { identifier: string; recoveryCode: string; password: string }) =>
     request<{ user: AccountUser; recoveryCode: string }>('POST', '/api/auth/pulih', b),
   changePassword: (b: { current: string; next: string }) => request<{ ok: true }>('POST', '/api/auth/kata-laluan', b),
+  newRecoveryCode: (password: string) => request<{ recoveryCode: string }>('POST', '/api/auth/kod-pemulihan', { password }),
   deleteAccount: (password: string) => request<{ ok: true }>('POST', '/api/auth/padam', { password }),
   getProgress: () => request<{ state: unknown; updatedAt: number }>('GET', '/api/kemajuan'),
   putProgress: (state: unknown) => request<{ updatedAt: number }>('PUT', '/api/kemajuan', { state }),

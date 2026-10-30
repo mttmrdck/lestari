@@ -166,6 +166,24 @@ describe('login and sessions', () => {
     expect(r.status).toBe(403);
   });
 
+  it('refuses the opaque origin of a sandboxed frame instead of crashing', async () => {
+    const r = await call('POST', '/api/auth/masuk', { identifier: 'x', password: 'y' }, { headers: { origin: 'null' } });
+    expect(r.status).toBe(403);
+  });
+
+  it('a guesser elsewhere cannot lock the real learner out', async () => {
+    await register();
+    for (let i = 0; i < 9; i++) await call('POST', '/api/auth/masuk', { identifier: 'ali_hakim', password: 'salah1234' }, { headers: { 'cf-connecting-ip': '9.9.9.9' } });
+    expect((await call('POST', '/api/auth/masuk', { identifier: 'ali_hakim', password: 'salah1234' }, { headers: { 'cf-connecting-ip': '9.9.9.9' } })).status).toBe(429);
+    expect((await call('POST', '/api/auth/masuk', { identifier: 'ali_hakim', password: ALI.password })).status).toBe(200);
+  });
+
+  it('stops a distributed attack on one account', async () => {
+    await register();
+    for (let i = 0; i < 40; i++) await call('POST', '/api/auth/masuk', { identifier: 'ali_hakim', password: 'salah1234' }, { headers: { 'cf-connecting-ip': `10.0.0.${i}` } });
+    expect((await call('POST', '/api/auth/masuk', { identifier: 'ali_hakim', password: ALI.password }, { headers: { 'cf-connecting-ip': '10.0.1.1' } })).status).toBe(429);
+  });
+
   it('requires JSON, so a plain HTML form cannot post', async () => {
     const res = await handleApi(new Request(`${BASE}/api/auth/masuk`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'a=b' }), env, NOW);
     expect(res.status).toBe(415);
@@ -194,6 +212,15 @@ describe('password recovery and change', () => {
   it('rejects a wrong code', async () => {
     await register();
     expect((await call('POST', '/api/auth/pulih', { identifier: 'ali@contoh.my', recoveryCode: 'AAAA-AAAA-AAAA-AAAA', password: 'baharu123' })).status).toBe(401);
+  });
+
+  it('replaces a lost recovery code only with the password, and the old code stops working', async () => {
+    const r = await register();
+    expect((await call('POST', '/api/auth/kod-pemulihan', { password: 'salah1234' }, { cookie: r.cookie })).status).toBe(401);
+    const next = await call('POST', '/api/auth/kod-pemulihan', { password: ALI.password }, { cookie: r.cookie });
+    expect(next.body.recoveryCode).not.toBe(r.body.recoveryCode);
+    expect((await call('POST', '/api/auth/pulih', { identifier: 'ali_hakim', recoveryCode: r.body.recoveryCode, password: 'baharu123' })).status).toBe(401);
+    expect((await call('POST', '/api/auth/pulih', { identifier: 'ali_hakim', recoveryCode: next.body.recoveryCode, password: 'baharu123' })).status).toBe(200);
   });
 
   it('changes the password only with the current one', async () => {

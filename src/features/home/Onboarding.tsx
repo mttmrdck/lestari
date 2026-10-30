@@ -46,7 +46,7 @@ export function Onboarding({ open, onClose }: { open: boolean; onClose: () => vo
             {GOALS.map((g) => (
               <button key={g.value} type="button" role="radio" aria-checked={goal === g.value} onClick={() => setGoal(g.value)} className="chip h-auto min-h-14 flex-col justify-center gap-0 rounded-[12px] py-2">
                 <span>{g.label}</span>
-                <span className="text-[0.75rem] font-[500] opacity-80">{g.hint}</span>
+                <span className="text-[0.75rem] font-[500]">{g.hint}</span>
               </button>
             ))}
           </div>

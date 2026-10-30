@@ -25,3 +25,7 @@ Rollback: `npx wrangler deployments list`, then `npx wrangler rollback <version-
 ## After deploying
 
 Check `/api/health`, register a test account, run a theme filter and a situation search, and answer a quiz question while signed in. Delete the test account from Akaun afterwards so it does not appear on the board.
+
+## PWA and caching
+
+`vite.config.ts` generates `sw.js` from `scripts/sw-template.js` with a new cache name each build. Pages are network-first, so a release reaches users on their next online visit. `public/_headers` sets the security headers and long-lived caching for hashed assets. `node scripts/verify-live.mjs` repeats the main checks against a live URL using a throwaway account that it deletes.

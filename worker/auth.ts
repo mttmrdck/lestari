@@ -70,6 +70,7 @@ async function startSession(env: Env, req: Request, userId: string, remember: bo
   const ttl = remember ? REMEMBER_MS : SESSION_MS;
   await env.DB.batch([
     env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?1').bind(now),
+    env.DB.prepare('DELETE FROM rate_limits WHERE window_start < ?1').bind(now - DAY),
     env.DB.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)').bind(await sha256(token), userId, now, now + ttl),
   ]);
   return sessionCookie(req, token, remember ? ttl : null);
@@ -147,7 +148,11 @@ export async function login(env: Env, req: Request, now: number): Promise<Respon
   const password = typeof b.password === 'string' ? b.password : '';
   if (!identifier || !password) throw new HttpError(400, 'missing', 'Isikan e-mel atau nama pengguna, dan kata laluan.');
   await rateLimit(env.DB, `login:${clientIp(req)}`, 30, 15 * MIN, now);
-  await rateLimit(env.DB, `login:${await sha256(identifier)}`, 8, 15 * MIN, now);
+  // Per person and place, so a stranger cannot lock a learner out by guessing. The wider per-account
+  // limit still stops a distributed attack on one account.
+  const idHash = await sha256(identifier);
+  await rateLimit(env.DB, `login:${clientIp(req)}:${idHash}`, 8, 15 * MIN, now);
+  await rateLimit(env.DB, `login:${idHash}`, 40, 15 * MIN, now);
 
   const user = await findUser(env, identifier);
   // Hash even when the account does not exist, so the response time does not reveal which is true.
@@ -210,6 +215,18 @@ export async function changePassword(env: Env, req: Request, now: number): Promi
   ]);
   const cookie = await startSession(env, req, user.id, true, now);
   return json({ ok: true }, { headers: { 'set-cookie': cookie } });
+}
+
+/** A signed-in learner who lost the code can replace it, which invalidates the old one. */
+export async function newRecovery(env: Env, req: Request, now: number): Promise<Response> {
+  const session = await requireUser(env, req, now);
+  await rateLimit(env.DB, `newcode:${session.id}`, 5, 60 * MIN, now);
+  const b = await readJson<Record<string, unknown>>(req);
+  const user = (await findUser(env, session.email))!;
+  if (typeof b.password !== 'string' || !(await verifyPassword(user, b.password))) throw new HttpError(401, 'bad-credentials', 'Kata laluan tidak betul.');
+  const code = newRecoveryCode();
+  await env.DB.prepare('UPDATE users SET recovery_hash = ?1 WHERE id = ?2').bind(await sha256(code), user.id).run();
+  return json({ recoveryCode: code });
 }
 
 export async function deleteAccount(env: Env, req: Request, now: number): Promise<Response> {

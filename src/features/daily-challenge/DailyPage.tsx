@@ -73,7 +73,7 @@ export default function DailyPage() {
         <Stars />
         <div className="flex items-center justify-between gap-3">
           <p className="text-[0.875rem] font-[650] text-on-night-muted">Petunjuk</p>
-          <div className="flex gap-1.5" aria-label={`${guesses.length} daripada ${DAILY_ATTEMPTS} cubaan digunakan`}>
+          <div role="img" className="flex gap-1.5" aria-label={`${guesses.length} daripada ${DAILY_ATTEMPTS} cubaan digunakan`}>
             {Array.from({ length: DAILY_ATTEMPTS }).map((_, i) => {
               const used = i < guesses.length;
               const win = status === 'won' && i === guesses.length - 1;
@@ -98,7 +98,7 @@ export default function DailyPage() {
             <label htmlFor="teka" className="text-[0.875rem] font-[650]">Jawapan kamu <span className="font-[500] text-on-night-muted">({left} cubaan lagi)</span></label>
             <div className="mt-2 flex gap-2">
               <input id="teka" value={guess} onChange={(e) => setGuess(e.target.value)} autoComplete="off" className="field min-w-0 flex-1 border-night-raised bg-night-raised text-on-night placeholder:text-on-night-muted focus:border-sun focus:shadow-none" placeholder="Taip peribahasa…" aria-describedby="teka-nota" />
-              <button type="submit" className="btn btn-sun shrink-0" disabled={!guess.trim()} aria-label="Hantar jawapan"><Send className="size-5" aria-hidden /><span className="hidden sm:inline">Teka</span></button>
+              <button type="submit" className="btn btn-sun shrink-0" disabled={!guess.trim()} aria-label="Teka: hantar jawapan"><Send className="size-5" aria-hidden /><span className="hidden sm:inline">Teka</span></button>
             </div>
             <p id="teka-nota" className="mt-2 text-[0.8125rem] text-on-night-muted">Salah ejaan kecil masih diterima.</p>
             {hint && <p role="alert" className="mt-2 text-[0.875rem] font-[600] text-sun">{hint}</p>}

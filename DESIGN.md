@@ -210,7 +210,7 @@ Colour has a job; nothing is coloured at random.
 
 ## Layout
 
-- **Mobile first:** compact top bar (wordmark, streak flame, XP), five-tab bottom bar (Utama, Cari, Latihan, Simpanan, Profil) with a sliding indicator. Lessons hide both bars and use the kit's layout: close button, progress bar, full-width answers and a fixed bottom action bar.
+- **Mobile first:** compact top bar (wordmark, streak flame, XP), five-tab bottom bar (Utama, Cari, Belajar, Juara, Profil) with a sliding indicator; the bar steps aside for the on-screen keyboard. Cari and Juara keep their filters when you come back. Simpanan lives inside Belajar. Lessons hide both bars and use the kit's layout: close button, progress bar, full-width answers and a fixed bottom action bar.
 - **Desktop:** a 248px sidebar with the same sliding indicator, shortcuts and today's goal; the dashboard splits 1.45 : 1 into the adventure column (hero, path) and a rail (daily challenge, activities, progress, badges).
 - Spacing on a 4px scale; touch targets at least 44px.
 
@@ -226,6 +226,8 @@ Depth is tactile, not blurry: controls and tiles sit on a solid **bottom edge** 
 
 ## Components
 
+- **Sheet:** a bottom sheet on phones (rises from the thumb zone, clears the home indicator), a centred dialog from 640px. Theme selection uses it.
+- **Flashcards:** swipe right for Mudah and left for Susah once the meaning shows, with the same ratings always available as buttons.
 - **Button:** primary (green), secondary (white, blue text, grey edge), sun (reward), sky (discovery), quiet (text). Disabled buttons turn flat grey.
 - **Learning path:** unit banner in the unit colour; nodes done (check), current (star, gentle pulse, "Mula" bubble, Bayu waving beside it), locked (grey lock, explains why).
 - **Lesson steps:** teach card, multiple choice with *Semak*, matching pairs, results with three stat tiles (XP, accuracy, correct).

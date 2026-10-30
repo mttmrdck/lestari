@@ -32,7 +32,11 @@ export async function readJson<T>(req: Request): Promise<T> {
 /** Cookies are SameSite=Lax; this also refuses cross-site writes from older browsers. */
 export function assertSameOrigin(req: Request): void {
   const origin = req.headers.get('origin');
-  if (origin && new URL(origin).host !== new URL(req.url).host) throw new HttpError(403, 'origin', 'Permintaan tidak dibenarkan.');
+  if (!origin) return;
+  // Sandboxed frames send "null", which is not a URL.
+  let host: string | null = null;
+  try { host = new URL(origin).host; } catch { /* treated as foreign */ }
+  if (host !== new URL(req.url).host) throw new HttpError(403, 'origin', 'Permintaan tidak dibenarkan.');
 }
 
 export const clientIp = (req: Request) => req.headers.get('cf-connecting-ip') ?? 'local';

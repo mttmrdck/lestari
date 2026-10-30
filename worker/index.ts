@@ -1,6 +1,6 @@
 import type { Env } from './env';
 import { HttpError, assertSameOrigin, fail, json } from './http';
-import { changePassword, deleteAccount, getProgress, login, logout, me, putProgress, recover, register, usernameAvailable } from './auth';
+import { changePassword, deleteAccount, getProgress, login, logout, me, newRecovery, putProgress, recover, register, usernameAvailable } from './auth';
 import { claimXp } from './xp';
 import { leaderboard } from './leaderboard';
 import { situasi } from './situasi';
@@ -18,6 +18,7 @@ const ROUTES: Record<string, Handler> = {
   'POST /api/auth/pulih': recover,
   'POST /api/auth/kata-laluan': changePassword,
   'POST /api/auth/padam': deleteAccount,
+  'POST /api/auth/kod-pemulihan': newRecovery,
   'GET /api/kemajuan': getProgress,
   'PUT /api/kemajuan': putProgress,
   'POST /api/xp': claimXp,

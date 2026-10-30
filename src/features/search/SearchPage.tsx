@@ -1,11 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Search, X, Mic, MicOff, Sparkles, ArrowRight, Info, MessageSquareQuote, KeyRound, Lightbulb } from 'lucide-react';
+import { Search, X, Mic, MicOff, Sparkles, ArrowRight, Info, MessageSquareQuote, KeyRound, Lightbulb, SlidersHorizontal } from 'lucide-react';
 import { RECORDS, THEMES, THEME_COUNTS, CATEGORY_INFO } from '../../lib/data';
 import { buildIndex, keywordSearch, situationSearch, frequentImageWords, POPULAR_KEYWORDS, type SemanticReading, type SituationResponse, type SituationResult } from '../../lib/search';
 import { readSituation } from '../../lib/api';
 import { KATEGORI, THEME_IDS, type Kategori, type ThemeId } from '../../types/peribahasa';
-import { PeribahasaRow, Segmented, Highlight, EmptyState, CategoryBadge } from '../../components/ui';
+import { PeribahasaRow, Segmented, Highlight, EmptyState, CategoryBadge, Sheet } from '../../components/ui';
 import { Mascot } from '../../components/Mascot';
 import { useStore } from '../../app/store';
 import { useDocumentTitle, useVoiceInput } from '../../hooks/media';
@@ -74,6 +74,7 @@ function KeywordMode() {
   const theme = validTheme(params.get('tema'));
   const deferred = useDeferredValue(text);
   const [limit, setLimit] = useState(30);
+  const [themeOpen, setThemeOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setText(urlQ); }, [urlQ]);
@@ -163,14 +164,24 @@ function KeywordMode() {
           <button type="button" className="chip" aria-pressed={!category} onClick={() => setFilter('kategori', null)}>Semua kategori</button>
           {KATEGORI.map((k) => <button key={k} type="button" className="chip" aria-pressed={category === k} onClick={() => setFilter('kategori', category === k ? null : k)}>{k}</button>)}
         </div>
-        <label className="flex shrink-0 items-center gap-2 text-[0.875rem] font-[600]">
-          <span className="text-ink-muted">Pilih tema</span>
-          <select value={theme ?? ''} onChange={(e) => setFilter('tema', e.target.value || null)} className="field min-h-10 w-auto py-1.5 pr-8 text-[0.875rem]">
-            <option value="">Semua tema</option>
-            {(Object.keys(THEMES) as ThemeId[]).map((t) => <option key={t} value={t}>{THEMES[t].label}</option>)}
-          </select>
-        </label>
+        <button type="button" className="btn btn-secondary btn-sm shrink-0" aria-haspopup="dialog" onClick={() => setThemeOpen(true)}>
+          <SlidersHorizontal className="size-4" aria-hidden />{theme ? THEMES[theme].label : 'Pilih tema'}
+        </button>
       </div>
+
+      <Sheet open={themeOpen} onClose={() => setThemeOpen(false)} title="Pilih tema">
+        <ul className="-mx-1 space-y-1">
+          {(Object.keys(THEMES) as ThemeId[]).map((t) => (
+            <li key={t}>
+              <button type="button" aria-pressed={theme === t} onClick={() => { setFilter('tema', t); setThemeOpen(false); }} className={`flex min-h-14 w-full items-center justify-between gap-3 rounded-[var(--radius-md)] px-3 py-2 text-left active:bg-sky-soft ${theme === t ? 'bg-sky-soft text-sky-ink' : ''}`}>
+                <span className="min-w-0"><span className="block font-[800]">{THEMES[t].label}</span><span className="block text-[0.8125rem] text-ink-muted">{THEMES[t].blurb}</span></span>
+                <span className="tnum shrink-0 rounded-full bg-surface-sunk px-2.5 py-0.5 text-[0.8125rem] font-[800] text-ink-muted">{THEME_COUNTS[t] ?? 0}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[0.8125rem] text-ink-subtle">Tema dicadangkan secara automatik daripada maksud peribahasa dan belum disemak oleh guru.</p>
+      </Sheet>
 
       {(theme || category) && (
         <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Tapisan aktif">
@@ -251,7 +262,7 @@ function ThemeBrowser({ onTheme }: { onTheme: (t: ThemeId) => void }) {
             </div>
           ))}
         </dl>
-        <p className="mt-4 flex items-start gap-2 text-[0.8125rem] text-ink-subtle"><Info className="mt-0.5 size-4 shrink-0" aria-hidden />Sumber asal tidak menyatakan kategori, jadi kebanyakan kategori dianggarkan oleh peraturan bahasa dan ditanda “anggaran”.</p>
+        <p className="mt-4 flex items-start gap-2 text-[0.8125rem] text-ink-subtle"><Info className="mt-0.5 size-4 shrink-0" aria-hidden />Sumber asal tidak menyatakan kategori atau tema. Kategori dianggarkan oleh peraturan bahasa dan ditanda “anggaran”; tema dicadangkan secara automatik daripada maksud. Kedua-duanya belum disemak oleh guru.</p>
       </section>
     </div>
   );
@@ -395,6 +406,7 @@ function SituationResults({ query, response, localOnly }: { query: string; respo
           <p className="text-[0.9375rem] font-[700]">Kami faham situasi ini tentang {understood.map((u) => u.label).join(', atau ')}.</p>
         </div>
       )}
+      {results[0]?.concept.nota && <p className="text-[0.875rem] text-ink-muted">{results[0].concept.nota}</p>}
       {localOnly && !weak && <p className="text-[0.8125rem] text-ink-subtle">Model perbandingan ayat tidak dapat dihubungi, jadi padanan ini berdasarkan peta konsep sahaja.</p>}
       {results.map((x, i) => (
         <article key={x.record.id} className={`card p-5 sm:p-6 ${i === 0 ? 'border-primary/40 shadow-[var(--shadow-rest)]' : ''} rise-in`} style={{ animationDelay: `${i * 50}ms` }}>

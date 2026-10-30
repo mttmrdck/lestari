@@ -9,7 +9,7 @@ export function CategoryBadge({ r, showBasis = false }: { r: Peribahasa; showBas
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-0.5 text-[0.78rem] font-[650] text-on-primary-soft">
       {r.category}
-      {showBasis && r.categoryBasis === 'peraturan' && <span className="font-[500] opacity-80">(anggaran)</span>}
+      {showBasis && r.categoryBasis === 'peraturan' && <span className="font-[500]">(anggaran)</span>}
     </span>
   );
 }
@@ -142,7 +142,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
       aria-labelledby={id}
       onClose={onClose}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
-      className="m-auto w-[min(520px,calc(100vw-24px))] rounded-[var(--radius-xl)] border border-line bg-surface p-0 text-ink shadow-[var(--shadow-lift)] backdrop:bg-ink/40 open:animate-[rise-in_240ms_var(--ease-out)]"
+      className="sheet mx-auto mb-0 mt-auto w-full max-w-full rounded-t-[var(--radius-xl)] border border-line bg-surface p-0 text-ink shadow-[var(--shadow-lift)] backdrop:bg-ink/40 sm:m-auto sm:w-[min(520px,calc(100vw-24px))] sm:rounded-[var(--radius-xl)]"
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
         <h2 id={id} className="text-[1.125rem] font-[700]">{title}</h2>
@@ -150,7 +150,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
           <X className="size-5" aria-hidden />
         </button>
       </div>
-      <div className="px-5 py-5">{children}</div>
+      <div className="sheet-body px-5 py-5">{children}</div>
     </dialog>
   );
 }

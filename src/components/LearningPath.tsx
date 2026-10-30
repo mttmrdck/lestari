@@ -18,7 +18,7 @@ export function UnitBanner({ unit, number, done }: { unit: Unit; number: number;
   const c = UNIT_COLORS[unit.color];
   return (
     <div className="relative overflow-hidden rounded-[var(--radius-lg)] px-5 py-4" style={{ background: c.fill, color: c.on, boxShadow: `0 4px 0 ${c.edge}` }}>
-      <p className="text-[0.8125rem] font-[800] opacity-80">Unit {number}</p>
+      <p className="text-[0.8125rem] font-[800]">Unit {number}</p>
       <h3 className="text-[1.3rem] font-[900] leading-tight">{unit.title}</h3>
       <p className="mt-0.5 text-[0.9rem] font-[650] opacity-90">{unit.blurb}</p>
       <p className="tnum mt-2 inline-flex rounded-full px-2.5 py-0.5 text-[0.8125rem] font-[850]" style={{ background: 'rgb(255 255 255 / 0.35)' }}>{done}/{unit.lessons.length} pelajaran</p>

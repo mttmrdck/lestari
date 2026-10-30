@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { RotateCw, ArrowRight, X, CalendarClock } from 'lucide-react';
 import { useProgress, useStore } from '../../app/store';
@@ -11,6 +11,9 @@ import { useDocumentTitle } from '../../hooks/media';
 import { PeribahasaRow, ProgressBar, EmptyState, CategoryBadge } from '../../components/ui';
 import { Mascot } from '../../components/Mascot';
 import type { Peribahasa } from '../../types/peribahasa';
+
+/** How far a card must travel before a swipe counts as a rating. */
+const SWIPE_DISTANCE = 90;
 
 type Tab = 'due' | 'fresh' | 'difficult' | 'mastered';
 
@@ -56,7 +59,7 @@ export default function FlashcardsPage() {
 
       <section className="mt-6 flex flex-col gap-5 rounded-[var(--radius-xl)] bg-primary p-6 text-on-primary sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[0.875rem] font-[650] text-on-primary/80">Sesi seterusnya</p>
+          <p className="text-[0.875rem] font-[650] text-on-primary">Sesi seterusnya</p>
           <p className="mt-1 font-display text-[1.5rem] font-[740] leading-tight">
             {startable.length ? `${startable.length} kad sedia` : 'Semua sudah diulang kaji'}
           </p>
@@ -73,7 +76,7 @@ export default function FlashcardsPage() {
 
       <div role="tablist" aria-label="Barisan kad" className="scroll-row mt-8">
         {tabs.map((t) => (
-          <button key={t.id} role="tab" type="button" aria-selected={tab === t.id} aria-controls="panel-kad" onClick={() => setTab(t.id)} className="chip" aria-pressed={tab === t.id}>
+          <button key={t.id} role="tab" type="button" aria-selected={tab === t.id} aria-controls="panel-kad" onClick={() => setTab(t.id)} className="chip">
             {t.label} <span className="tnum rounded-full bg-surface-sunk px-1.5 text-[0.75rem]">{t.list.length}</span>
           </button>
         ))}
@@ -118,6 +121,10 @@ function Session({ cards, onExit }: { cards: Peribahasa[]; onExit: () => void })
   const [tally, setTally] = useState<Record<Rating, number>>({ susah: 0, sederhana: 0, mudah: 0 });
   const r = queue[i];
   const now = Date.now();
+  const swipeCard = useRef<HTMLDivElement>(null);
+  const suppressClick = useRef(false);
+  const swipe = useRef<{ x: number; y: number; id: number; moved: boolean } | null>(null);
+  const [lean, setLean] = useState<'susah' | 'mudah' | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -139,6 +146,38 @@ function Session({ cards, onExit }: { cards: Peribahasa[]; onExit: () => void })
     }
     setFlipped(false);
     setI((x) => x + 1);
+  }
+
+  // Swiping only rates a card whose meaning is showing; the buttons below do the same thing.
+  const moveCard = (dx: number) => {
+    const el = swipeCard.current;
+    if (el) el.style.transform = dx ? `translateX(${dx}px) rotate(${dx / 24}deg)` : '';
+  };
+  function swipeStart(e: PointerEvent<HTMLDivElement>) {
+    if (flipped && e.pointerType !== 'mouse') swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false };
+  }
+  function swipeMove(e: PointerEvent<HTMLDivElement>) {
+    const s = swipe.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    if (!s.moved && Math.abs(e.clientY - s.y) > Math.abs(dx)) { swipe.current = null; return; }
+    if (Math.abs(dx) > 8) { s.moved = true; e.currentTarget.setPointerCapture(s.id); }
+    if (s.moved) {
+      if (swipeCard.current) swipeCard.current.style.transition = 'none';
+      moveCard(dx);
+      setLean(Math.abs(dx) < SWIPE_DISTANCE ? null : dx > 0 ? 'mudah' : 'susah');
+    }
+  }
+  function swipeEnd(e: PointerEvent<HTMLDivElement>) {
+    const s = swipe.current;
+    swipe.current = null;
+    if (!s?.moved) return;
+    const dx = e.clientX - s.x;
+    if (swipeCard.current) swipeCard.current.style.transition = '';
+    moveCard(0);
+    setLean(null);
+    suppressClick.current = true;
+    if (Math.abs(dx) >= SWIPE_DISTANCE) onRate(dx > 0 ? 'mudah' : 'susah');
   }
 
   if (!r) {
@@ -176,10 +215,11 @@ function Session({ cards, onExit }: { cards: Peribahasa[]; onExit: () => void })
       </div>
       <p className="mt-4 text-center text-[0.8125rem] font-[600] text-ink-muted">{existing ? 'Ulang kaji' : 'Kad baharu'}</p>
 
-      <div className="flip mt-3">
+      <div ref={swipeCard} className="flip swipe-card relative mt-3" onPointerDown={swipeStart} onPointerMove={swipeMove} onPointerUp={swipeEnd} onPointerCancel={swipeEnd}>
+        {lean && <span aria-hidden className={`absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full px-4 py-1.5 font-[900] ${lean === 'mudah' ? 'bg-primary text-on-primary' : 'bg-rose text-on-rose'}`}>{lean === 'mudah' ? 'Mudah' : 'Susah'}</span>}
         <button
           type="button"
-          onClick={() => setFlipped((f) => !f)}
+          onClick={() => { if (suppressClick.current) { suppressClick.current = false; return; } setFlipped((f) => !f); }}
           aria-label={flipped ? 'Tunjuk peribahasa' : 'Terbalikkan kad untuk melihat maksud'}
           className="block w-full text-left"
         >
@@ -203,12 +243,12 @@ function Session({ cards, onExit }: { cards: Peribahasa[]; onExit: () => void })
       <div className="mt-6" aria-live="polite">
         {flipped ? (
           <div>
-            <p className="mb-2 text-center text-[0.875rem] font-[650] text-ink-muted">Sejauh mana kamu ingat?</p>
+            <p className="mb-2 text-center text-[0.875rem] font-[650] text-ink-muted">Sejauh mana kamu ingat?<span className="pointer-coarse:inline hidden"> Leret kanan untuk Mudah, kiri untuk Susah.</span></p>
             <div className="grid grid-cols-3 gap-2.5">
               {RATINGS.map(({ r: k, label, cls }, idx) => (
                 <button key={k} type="button" onClick={() => onRate(k)} className={`flex min-h-16 flex-col items-center justify-center rounded-[14px] border-2 font-[750] transition-[border-color,transform] duration-150 active:scale-[0.98] ${cls}`}>
                   {label}
-                  <span className="text-[0.75rem] font-[600] opacity-80">{preview[k]}</span>
+                  <span className="text-[0.75rem] font-[600]">{preview[k]}</span>
                   <span className="sr-only">, kekunci {idx + 1}</span>
                 </button>
               ))}

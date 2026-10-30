@@ -17,6 +17,8 @@ export interface SituationConcept {
   /** Why a saying attached to this concept fits; states the shared idea, never the learner's words. */
   why: string;
   cues: string[];
+  /** Shown with the results when the collection has no saying exactly about this. */
+  nota?: string;
   /** Concepts this one overrides when both fire (the narrower reading wins). */
   overrides?: string[];
 }
@@ -32,6 +34,7 @@ export const CONCEPTS: SituationConcept[] = [
   // ---------- Hubungan ----------
   { id: 'kawan-kepentingan', group: 'hubungan', label: 'hubungan yang wujud kerana kepentingan diri, bukan keikhlasan',
     why: 'Peribahasa ini menggambarkan orang yang rapat ketika ada faedah untuk dirinya, bukan kerana persahabatan yang ikhlas.',
+    nota: 'Koleksi LESTARI belum ada peribahasa khusus tentang kawan palsu, jadi ini padanan yang paling hampir.',
     overrides: ['sahabat-akrab', 'sedih-kecewa', 'miskin'],
     cues: [
       `3:${KAWAN}|dia|mereka + kepentingan + sendiri|diri|peribadi`,
