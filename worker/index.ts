@@ -4,6 +4,7 @@ import { changePassword, deleteAccount, getProgress, login, logout, me, putProgr
 import { claimXp } from './xp';
 import { leaderboard } from './leaderboard';
 import { situasi } from './situasi';
+import { supabaseHealth } from './supabase';
 
 type Handler = (env: Env, req: Request, now: number) => Promise<Response>;
 
@@ -22,6 +23,7 @@ const ROUTES: Record<string, Handler> = {
   'POST /api/xp': claimXp,
   'GET /api/papan-juara': leaderboard,
   'POST /api/situasi': situasi,
+  'GET /api/supabase/status': (env, req, now) => supabaseHealth(env, req, now),
 };
 
 export async function handleApi(req: Request, env: Env, now = Date.now()): Promise<Response> {

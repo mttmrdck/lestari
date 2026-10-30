@@ -15,6 +15,7 @@ LESTARI is a mobile-first React app for learning Malay peribahasa, served by a C
 | Browser checks (needs `npm run dev:api` running on a fresh local database and Chrome, Brave or Edge installed; `CHROME_PATH` overrides) | `npm run e2e` |
 | Measure situation search; `-- --report` rewrites the report | `npm run eval:situasi` |
 | Re-embed the example situations (after editing `data/curated/situations.json`) | `npm run data:embed` |
+| Check the Supabase connection | `npm run supabase:check` |
 | Deploy (after reading `docs/deployment.md`) | `npm run deploy` |
 | Lint | `npm run lint` |
 | Lint the design system | `npm run design:lint` |
@@ -55,6 +56,7 @@ docs/                    data-quality report, learning model, design DNA, resour
 - **Sensitive records** (`data/curated/review.json`) stay searchable but must not appear in quizzes, flashcards or the daily puzzle. Use `LEARNABLE` or `CORE`, never `RECORDS`, for anything that teaches.
 - **Situation search** only ever returns sayings attached to a concept in `data/curated/semantics.json`. The model chooses concepts, never sayings. Do not tune against `data/eval/situasi-ujian.json`, and do not copy eval sentences into `situations.json`: a score only means something on sentences the system has not seen. After a real change, write new test sentences.
 - **Leaderboard XP** comes only from the `xp_events` ledger. The server prices every action in `worker/xp.ts`; a new XP rule must change `src/lib/progress.ts`, `worker/xp.ts` and `docs/learning-model.md` together. Never accept an amount from the client. Demo profiles stay in `worker/leaderboard.ts`, always flagged, never in the database.
+- **Supabase** is optional and holds no accounts. Cloudflare stays authoritative for login, sessions and XP. Read `docs/supabase.md` before using it; never add a second login.
 - **Lessons** live in `src/lib/lessons.ts`. Units group sayings by meaning-derived theme plus hand-checked `include`/`exclude` lists; a saying belongs to one lesson only. Check a new grouping by reading every saying's meaning.
 - **Copy** is Malaysian Bahasa Melayu, second person (`kamu`), encouraging, never shaming.
 

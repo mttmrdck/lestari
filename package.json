@@ -19,12 +19,14 @@
     "data:embed": "tsx scripts/build-embeddings.ts",
     "dev:api": "wrangler dev --port 8787",
     "db:migrate:local": "wrangler d1 migrations apply lestari --local",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "supabase:check": "tsx scripts/check-supabase.ts"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/nunito": "^5.3.0",
     "@gsap/react": "^2.1.2",
+    "@supabase/supabase-js": "2.118.0",
     "gsap": "^3.15.0",
     "lucide-react": "^1.64.0",
     "react": "^19.3.1",

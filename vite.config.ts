@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // docs/supabase.md: the Supabase values keep their documented names.
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   server: { proxy: { '/api': 'http://localhost:8787' } },
   build: {
     rollupOptions: {

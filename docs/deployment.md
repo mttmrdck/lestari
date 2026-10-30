@@ -8,7 +8,7 @@ LESTARI is one Cloudflare Worker (`lestari`) serving the built app from `dist/`,
 | `DB` | D1 database `lestari` | accounts, sessions, XP ledger, progress copies, rate limits |
 | `AI` | Workers AI (`@cf/baai/bge-m3`) | sentence embeddings for Carian Situasi |
 
-There are no secrets or environment variables. Bindings are declared in `wrangler.jsonc`; the D1 `database_id` there is an identifier, not a credential.
+Bindings are declared in `wrangler.jsonc`; the D1 `database_id` there is an identifier, not a credential. Two optional Worker secrets hold the Supabase URL and publishable key (`docs/supabase.md`). No password or private key is stored in the repository.
 
 ## Release
 
