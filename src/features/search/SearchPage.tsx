@@ -1,9 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Search, X, Mic, MicOff, Sparkles, ArrowRight, Info, MessageSquareQuote, KeyRound } from 'lucide-react';
-import { RECORDS, BY_ID, THEMES, THEME_COUNTS, CATEGORY_INFO } from '../../lib/data';
-import { buildIndex, keywordSearch, situationSearch, frequentImageWords, POPULAR_KEYWORDS, type SituationResult } from '../../lib/search';
-import { KATEGORI, type Kategori, type ThemeId } from '../../types/peribahasa';
+import { Search, X, Mic, MicOff, Sparkles, ArrowRight, Info, MessageSquareQuote, KeyRound, Lightbulb } from 'lucide-react';
+import { RECORDS, THEMES, THEME_COUNTS, CATEGORY_INFO } from '../../lib/data';
+import { buildIndex, keywordSearch, situationSearch, frequentImageWords, POPULAR_KEYWORDS, type SemanticReading, type SituationResponse, type SituationResult } from '../../lib/search';
+import { readSituation } from '../../lib/api';
+import { KATEGORI, THEME_IDS, type Kategori, type ThemeId } from '../../types/peribahasa';
 import { PeribahasaRow, Segmented, Highlight, EmptyState, CategoryBadge } from '../../components/ui';
 import { Mascot } from '../../components/Mascot';
 import { useStore } from '../../app/store';
@@ -19,10 +20,14 @@ const VOCAB = (() => {
 })();
 
 const EXAMPLES = [
+  'Dia hanya datang apabila saya mempunyai wang.',
   'Ali baru mula belajar apabila peperiksaan tinggal seminggu.',
-  'Semua ahli kelas bergotong-royong membersihkan kelas bersama-sama.',
   'Walaupun gagal dua kali, dia terus mencuba dan tidak berputus asa.',
 ];
+
+/** Values from the URL can be stale or hand-typed, so only known ids count as active filters. */
+const validTheme = (v: string | null): ThemeId | null => (THEME_IDS as readonly string[]).includes(v ?? '') ? v as ThemeId : null;
+const validCategory = (v: string | null): Kategori | null => (KATEGORI as readonly string[]).includes(v ?? '') ? v as Kategori : null;
 
 type Mode = 'kata' | 'situasi';
 
@@ -34,7 +39,8 @@ export default function SearchPage() {
   const setMode = (m: Mode) => {
     const next = new URLSearchParams(params);
     next.set('mode', m);
-    next.delete('q');
+    // Each mode starts clean; a theme chosen in Kata Kunci must not linger in the URL.
+    for (const key of ['q', 'tema', 'kategori']) next.delete(key);
     setParams(next, { replace: true });
   };
 
@@ -64,8 +70,8 @@ function KeywordMode() {
   const [params, setParams] = useSearchParams();
   const urlQ = params.get('q') ?? '';
   const [text, setText] = useState(urlQ);
-  const category = (params.get('kategori') as Kategori | null) || null;
-  const theme = (params.get('tema') as ThemeId | null) || null;
+  const category = validCategory(params.get('kategori'));
+  const theme = validTheme(params.get('tema'));
   const deferred = useDeferredValue(text);
   const [limit, setLimit] = useState(30);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +105,7 @@ function KeywordMode() {
   const wordSuggestions = q.length >= 2 ? VOCAB.filter((w) => w.startsWith(q.split(' ').pop()!) && w !== q).slice(0, 6) : [];
   const nearMisses = q.length >= 3 && !results.length ? VOCAB.filter((w) => Math.abs(w.length - q.length) <= 2 && levenshtein(w, q) <= 2).slice(0, 5) : [];
   const browsing = !q && !category && !theme;
+  const filterName = [theme ? `tema ${THEMES[theme].label}` : null, category ? `kategori ${category}` : null].filter(Boolean).join(' dan ');
 
   const runChip = (word: string) => { setText(word); inputRef.current?.focus(); };
   const voice = useVoiceInput((t) => setText(t.replace(/[.?!]+$/, '')));
@@ -157,7 +164,7 @@ function KeywordMode() {
           {KATEGORI.map((k) => <button key={k} type="button" className="chip" aria-pressed={category === k} onClick={() => setFilter('kategori', category === k ? null : k)}>{k}</button>)}
         </div>
         <label className="flex shrink-0 items-center gap-2 text-[0.875rem] font-[600]">
-          <span className="text-ink-muted">Tema</span>
+          <span className="text-ink-muted">Pilih tema</span>
           <select value={theme ?? ''} onChange={(e) => setFilter('tema', e.target.value || null)} className="field min-h-10 w-auto py-1.5 pr-8 text-[0.875rem]">
             <option value="">Semua tema</option>
             {(Object.keys(THEMES) as ThemeId[]).map((t) => <option key={t} value={t}>{THEMES[t].label}</option>)}
@@ -165,19 +172,35 @@ function KeywordMode() {
         </label>
       </div>
 
+      {(theme || category) && (
+        <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Tapisan aktif">
+          <span className="text-[0.8125rem] font-[650] text-ink-muted">Tapisan:</span>
+          {theme && (
+            <button type="button" className="chip" aria-pressed="true" onClick={() => setFilter('tema', null)} aria-label={`Buang tema ${THEMES[theme].label}`}>
+              {THEMES[theme].label} <X className="size-4" aria-hidden />
+            </button>
+          )}
+          {category && (
+            <button type="button" className="chip" aria-pressed="true" onClick={() => setFilter('kategori', null)} aria-label={`Buang kategori ${category}`}>
+              {category} <X className="size-4" aria-hidden />
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="mt-6" aria-live="polite">
         {browsing ? (
           <ThemeBrowser onTheme={(t) => setFilter('tema', t)} />
         ) : results.length === 0 ? (
-          <EmptyState art={<Mascot mood="think" className="size-20" />} title={q ? `Tiada peribahasa ditemui untuk “${deferred.trim()}”` : 'Tiada peribahasa dalam tapisan ini'}>
-            <p>{nearMisses.length ? 'Mungkin maksud kamu:' : 'Cuba kata yang lebih umum, buang tapisan, atau ceritakan situasi dalam mod Situasi.'}</p>
+          <EmptyState art={<Mascot mood="think" className="size-20" />} title={q ? `Tiada peribahasa ditemui untuk “${deferred.trim()}”${filterName ? ` dalam ${filterName}` : ''}` : `Tiada peribahasa dalam ${filterName}`}>
+            <p>{nearMisses.length ? 'Mungkin maksud kamu:' : (theme || category) ? 'Gabungan ini belum ada dalam koleksi. Buang satu tapisan untuk melihat lebih banyak peribahasa.' : 'Cuba kata yang lebih umum, atau ceritakan situasi dalam mod Situasi.'}</p>
             {nearMisses.length > 0 && <div className="mt-3 flex flex-wrap justify-center gap-2">{nearMisses.map((w) => <button key={w} type="button" className="chip" onClick={() => runChip(w)}>{w}</button>)}</div>}
             {(category || theme) && <button type="button" className="btn btn-quiet mt-3" onClick={() => { const n = new URLSearchParams(params); n.delete('kategori'); n.delete('tema'); setParams(n, { replace: true }); }}>Buang tapisan</button>}
           </EmptyState>
         ) : (
           <div className="space-y-8">
-            <p className="text-[0.9375rem] font-[600] text-ink-muted">{results.length} peribahasa ditemui</p>
-            {([['peribahasa', 'Dalam peribahasa'], ['maksud', 'Dalam maksud'], ['tema', theme ? 'Dalam tema' : 'Berkaitan tema']] as const).map(([key, title]) => {
+            <p className="text-[0.9375rem] font-[600] text-ink-muted" data-testid="bilangan-hasil"><span className="tnum">{results.length}</span> peribahasa ditemui{filterName ? ` dalam ${filterName}` : ''}</p>
+            {([['peribahasa', 'Dalam peribahasa'], ['maksud', 'Dalam maksud'], ['tema', q ? 'Berkaitan tema' : 'Dalam tapisan ini']] as const).map(([key, title]) => {
               const list = groups[key];
               if (!list.length) return null;
               return (
@@ -242,12 +265,26 @@ function SituationMode() {
   const [text, setText] = useState(urlQ);
   const store = useStore();
   const voice = useVoiceInput((t) => setText((prev) => (prev ? `${prev} ${t}` : t)));
-  const response = useMemo(() => (urlQ ? situationSearch(INDEX, urlQ, { byId: BY_ID }) : null), [urlQ]);
+  const [reading, setReading] = useState<{ q: string; semantic: SemanticReading | null } | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const tooShort = urlQ && normalize(urlQ).split(' ').length < 2;
+  const tooShort = !!urlQ && normalize(urlQ).split(' ').length < 2;
+
+  // The whole-sentence reading comes from the server. If it cannot answer, local cues still work.
+  useEffect(() => {
+    if (!urlQ || tooShort) return;
+    let stale = false;
+    void readSituation(urlQ).then((semantic) => { if (!stale) setReading({ q: urlQ, semantic }); });
+    return () => { stale = true; };
+  }, [urlQ, tooShort]);
+
+  const ready = reading?.q === urlQ;
+  const response = useMemo<SituationResponse | null>(
+    () => (urlQ && ready ? situationSearch(INDEX, urlQ, { semantic: reading?.semantic ?? undefined }) : null),
+    [urlQ, ready, reading],
+  );
 
   useEffect(() => {
-    if (response && response.results.length && !response.weak) store.logSituationSearch(urlQ);
+    if (response && response.results.length) store.logSituationSearch(urlQ);
   }, [response, urlQ, store]);
 
   function submit(e?: FormEvent, value = text) {
@@ -263,13 +300,14 @@ function SituationMode() {
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:items-start">
       <form onSubmit={submit} className="lg:sticky lg:top-8">
         <label htmlFor="situasi" className="font-[700]">Ceritakan situasi</label>
-        <p className="mt-0.5 text-[0.875rem] text-ink-muted">Tulis apa yang berlaku dalam satu atau dua ayat.</p>
+        <p className="mt-0.5 text-[0.875rem] text-ink-muted">Tulis apa yang berlaku dalam satu atau dua ayat, dengan bahasa kamu sendiri.</p>
         <div className="relative mt-2">
           <textarea
             id="situasi"
             rows={4}
+            maxLength={500}
             className="field min-h-[132px] resize-y pb-12 text-[1.0625rem] leading-relaxed"
-            placeholder="Contoh: Ali baru mula belajar apabila peperiksaan tinggal seminggu."
+            placeholder="Contoh: Dia hanya datang apabila saya mempunyai wang."
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
@@ -303,7 +341,7 @@ function SituationMode() {
         </div>
         <p className="mt-5 flex items-start gap-2 text-[0.8125rem] text-ink-subtle">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          Carian ini memadankan situasi kamu dengan peta konsep dan kata kunci yang disusun oleh pasukan LESTARI. Ia bukan model AI, dan hanya mencadangkan peribahasa daripada koleksi.
+          LESTARI mengenal pasti maksud situasi dengan peta konsep dan model perbandingan ayat. Model itu tidak menulis jawapan: setiap cadangan dipilih daripada koleksi yang disemak, dan peribahasa yang tidak sesuai tidak dipaparkan.
         </p>
       </form>
 
@@ -314,8 +352,13 @@ function SituationMode() {
           </EmptyState>
         ) : tooShort ? (
           <EmptyState art={<Mascot mood="think" className="size-20" />} title="Ceritakan sedikit lagi">Tulis sekurang-kurangnya satu ayat pendek supaya padanan lebih tepat.</EmptyState>
-        ) : response && (
-          <SituationResults query={urlQ} results={response.results} weak={response.weak} related={response.relatedTerms} />
+        ) : !response ? (
+          <div role="status" className="flex items-center gap-4 rounded-[var(--radius-lg)] border-2 border-line bg-surface p-5">
+            <Mascot mood="think" idle className="size-16 shrink-0" />
+            <p className="font-[750]">Bayu sedang memahami situasi kamu…</p>
+          </div>
+        ) : (
+          <SituationResults query={urlQ} response={response} localOnly={!reading?.semantic} />
         )}
       </div>
     </div>
@@ -324,30 +367,37 @@ function SituationMode() {
 
 const STRENGTH: Record<SituationResult['strength'], { label: string; cls: string }> = {
   kuat: { label: 'Padanan kuat', cls: 'bg-mint-soft text-mint' },
-  sederhana: { label: 'Padanan sederhana', cls: 'bg-sun-soft text-sun-ink' },
-  lemah: { label: 'Padanan lemah', cls: 'bg-surface-sunk text-ink-muted' },
+  sederhana: { label: 'Padanan berkaitan', cls: 'bg-sun-soft text-sun-ink' },
 };
 
-function SituationResults({ query, results, weak, related }: { query: string; results: SituationResult[]; weak: boolean; related: string[] }) {
+function SituationResults({ query, response, localOnly }: { query: string; response: SituationResponse; localOnly: boolean }) {
+  const { results, understood, weak, relatedTerms: related } = response;
   return (
     <div className="space-y-4">
-      {weak && (
-        <div className="rounded-[var(--radius-lg)] border border-line-strong bg-surface p-5">
-          <p className="font-[700]">Tiada padanan yang kukuh untuk situasi ini.</p>
-          <p className="mt-1 text-[0.9375rem] text-ink-muted">
-            Cuba terangkan apa yang dilakukan oleh watak dan akibatnya, contohnya “dia tidak mendengar nasihat” atau “mereka bekerjasama”.
-            {results.length > 0 && ' Padanan lemah di bawah hanya berdasarkan beberapa perkataan.'}
-          </p>
+      {weak ? (
+        <div className="rounded-[var(--radius-lg)] border-2 border-line-strong bg-surface p-5" data-testid="tiada-padanan">
+          <div className="flex items-start gap-4">
+            <Mascot mood="think" className="size-16 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-[800]">Belum jumpa peribahasa yang benar-benar sepadan dengan situasi ini.</p>
+              <p className="mt-1 text-[0.9375rem] text-ink-muted">Cuba terangkan situasi dengan lebih khusus: apa yang dilakukan oleh watak, dan apa akibatnya.</p>
+            </div>
+          </div>
           {related.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {related.map((w) => <Link key={w} to={`/cari?mode=kata&q=${encodeURIComponent(w)}`} className="chip no-underline">Cari “{w}”</Link>)}
             </div>
           )}
         </div>
+      ) : (
+        <div className="flex items-start gap-3 rounded-[var(--radius-lg)] bg-sky-soft p-4 text-sky-ink" data-testid="kefahaman">
+          <Lightbulb className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <p className="text-[0.9375rem] font-[700]">Kami faham situasi ini tentang {understood.map((u) => u.label).join(', atau ')}.</p>
+        </div>
       )}
-      {!weak && <p className="text-[0.875rem] text-ink-muted">Label padanan ialah anggaran kesesuaian berdasarkan peraturan, bukan ukuran kebarangkalian.</p>}
+      {localOnly && !weak && <p className="text-[0.8125rem] text-ink-subtle">Model perbandingan ayat tidak dapat dihubungi, jadi padanan ini berdasarkan peta konsep sahaja.</p>}
       {results.map((x, i) => (
-        <article key={x.record.id} className={`card p-5 sm:p-6 ${i === 0 && !weak ? 'border-primary/40 shadow-[var(--shadow-rest)]' : ''} rise-in`} style={{ animationDelay: `${i * 50}ms` }}>
+        <article key={x.record.id} className={`card p-5 sm:p-6 ${i === 0 ? 'border-primary/40 shadow-[var(--shadow-rest)]' : ''} rise-in`} style={{ animationDelay: `${i * 50}ms` }}>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-2.5 py-0.5 text-[0.78rem] font-[700] ${STRENGTH[x.strength].cls}`}>{STRENGTH[x.strength].label}</span>
             <CategoryBadge r={x.record} showBasis />
@@ -359,8 +409,8 @@ function SituationResults({ query, results, weak, related }: { query: string; re
 
           {/* The match bridge: the student's own sentence with the words that drove the match. */}
           <div className="mt-4 rounded-[14px] bg-surface-sunk p-4">
-            <p className="text-[0.8125rem] font-[650] text-ink-muted">Sebab padanan</p>
-            <p className="mt-1 text-[0.9375rem] leading-relaxed"><Highlight text={query} terms={x.matched} /></p>
+            <p className="text-[0.8125rem] font-[650] text-ink-muted">Mengapa sesuai</p>
+            {x.matched.length > 0 && <p className="mt-1 text-[0.9375rem] leading-relaxed"><Highlight text={query} terms={x.matched} /></p>}
             <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink">{x.sebab}</p>
           </div>
 

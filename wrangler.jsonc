@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lestari",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "lestari", "database_id": "afe50013-eeea-4d01-a7b9-e647f70d1d17", "migrations_dir": "migrations" }
+  ],
+  "ai": { "binding": "AI", "remote": true },
+  "observability": { "enabled": true }
+}

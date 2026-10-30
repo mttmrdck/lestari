@@ -30,7 +30,7 @@ export function Onboarding({ open, onClose }: { open: boolean; onClose: () => vo
         <div>
           <label htmlFor="nama" className="text-[0.875rem] font-[650]">Nama panggilan</label>
           <input id="nama" className="field mt-1.5" value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Aina" autoComplete="nickname" maxLength={24} />
-          <p className="mt-1 text-[0.8125rem] text-ink-subtle">Disimpan dalam pelayar ini sahaja. Boleh dibiarkan kosong.</p>
+          <p className="mt-1 text-[0.8125rem] text-ink-subtle">Boleh dibiarkan kosong.</p>
         </div>
         <fieldset>
           <legend className="text-[0.875rem] font-[650]">Tahap persekolahan</legend>

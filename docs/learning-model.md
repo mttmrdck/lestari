@@ -58,6 +58,21 @@ The saying is `pool[hash("lestari:" + date) % pool.length]`, where the pool is t
 
 ## Situation search scoring
 
-1. **Concepts** (`src/content/concepts.ts`): each trigger phrase found in the input adds 2, each single word (or its stem, at least 5 letters) adds 1. A concept's sayings score `weight × (4 − 0.6 × rank)`.
-2. **Lexical**: distinct input words found in a saying's meaning or keywords add an IDF-weighted score × 0.55.
-3. **Labels** (relevance estimates, not probabilities): *kuat* = concept weight ≥ 2 and the saying is in the concept's top two; *sederhana* = concept weight ≥ 2 or 2+ distinct meaning words; otherwise *lemah*. If nothing reaches *sederhana*, the UI says there is no strong match.
+Full results and the history of each decision: `docs/situation-search-evaluation.md`.
+
+1. **Normalise** (`src/lib/semantic.ts`): lowercase, informal spellings to standard ("xde duit" becomes "tiada wang"), reduplication, and negation tracking, so "tidak sombong" never counts as "sombong".
+2. **Cues** (`src/content/taxonomy.ts`): each concept has weighted rules (`a|b + c ! d`). A concept needs a weight of 2, so one weak word such as "kawan" decides nothing.
+3. **Sentence similarity** (`worker/situasi.ts`): the sentence is embedded with `@cf/baai/bge-m3` and compared with 623 example situations (`data/curated/situations.json`). A concept's score is the mean of its two closest examples. A `_neutral` class of ordinary sentences lets the system recognise "this is not a peribahasa situation".
+4. **Combine** (`mergeHits` in `src/lib/search.ts`): `final = similarity + 0.06 if a cue also fired`. A concept must reach 0.55 and beat the neutral class; only concepts within 0.02 of the best are kept. Similarity can overrule a cue that misfired. If the model is unavailable, cues decide alone and the page says so.
+5. **Retrieve and rank:** only sayings attached to a kept concept in `data/curated/semantics.json` can appear. Curated order, primary before related, and small tie-breakers set the order. A saying listed under `bukan` for a kept concept is removed. Results below 62% of the best are dropped, and related sayings are dropped once two primary ones qualify.
+6. **Labels** (estimates, not probabilities): *Padanan kuat* or *Padanan berkaitan*. If nothing qualifies, the page says so instead of showing weak results.
+
+## Leaderboard and XP ledger
+
+Local XP (shown in the header) and leaderboard XP are separate on purpose. The browser reports what the learner did (`XpClaim`); `worker/xp.ts` decides whether that action is valid and what it is worth, using the table above. A unique key per user prevents double payment, including retries. Daily challenge wins are re-graded on the server.
+
+Limits: 300 XP per Malaysian calendar day in total, 8 quiz-session bonuses, 60 flashcard reviews and 20 explorations. Guest XP from before signing in is kept in the learner's progress but never counts on the leaderboard.
+
+**What this does not prove.** A quiz answer is graded in the browser, so a determined person with a script can claim correct answers for real sayings. The daily cap limits the damage to 300 XP a day. Server-side question delivery would be needed to close that gap.
+
+Ranking: most XP in the period, then whoever reached that total first, then account id. Weeks start on Monday in Malaysian time. Rank movement compares the board at the end of yesterday with the board now.

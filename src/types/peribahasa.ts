@@ -49,6 +49,14 @@ export interface ContohAyat {
   origin: 'sumber' | 'disediakan-lestari';
 }
 
+/** Curated meaning map from data/curated/semantics.json: concept id -> position in that concept's list. */
+export interface Semantik {
+  utama: Record<string, number>;
+  berkaitan: Record<string, number>;
+  /** Concepts this saying sounds related to but must never be used for. */
+  bukan: string[];
+}
+
 export interface Peribahasa {
   id: string;
   peribahasa: string;
@@ -68,6 +76,7 @@ export interface Peribahasa {
   commonMistakes: string[];
   usageTip?: string;
   bilaSesuai?: string;
+  semantik?: Semantik;
   relatedPeribahasa: string[];
   /** Records that are spelling or wording variants of the same saying. */
   variants: string[];

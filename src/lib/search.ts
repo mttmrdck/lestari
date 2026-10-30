@@ -1,7 +1,8 @@
 import type { Kategori, Peribahasa, ThemeId } from '../types/peribahasa';
-import { CONCEPTS, type Concept } from '../content/concepts';
 import { normalize, tokenize, contentTokens, stems, STOPWORDS, MIN_STEM_MATCH } from './text';
 import { THEMES } from './data';
+import { CONCEPT_BY_ID, detectConcepts, type ConceptHit } from './semantic';
+import type { SituationConcept } from '../content/taxonomy';
 
 // ---------- Index ----------
 
@@ -44,9 +45,19 @@ export interface KeywordResult {
   terms: string[];
 }
 
+/** True when a filter is set; the filters alone are then a valid search. */
+const hasFilter = (f: KeywordFilters) => !!(f.category || f.theme);
+
 export function keywordSearch(index: Indexed[], query: string, filters: KeywordFilters = {}, opts: { prefix?: boolean } = {}): KeywordResult[] {
   const q = normalize(query);
-  if (!q) return [];
+  if (!q) {
+    if (!hasFilter(filters)) return [];
+    // No words typed: list everything the filters allow, in a stable order.
+    return index
+      .filter(({ r }) => (!filters.category || r.category === filters.category) && (!filters.theme || r.themes.includes(filters.theme)))
+      .map(({ r }): KeywordResult => ({ record: r, score: 0, where: 'tema', terms: [] }))
+      .sort((a, b) => a.record.normalizedText.localeCompare(b.record.normalizedText, 'ms'));
+  }
   let qTokens = contentTokens(q, true);
   if (!qTokens.length) qTokens = tokenize(q);
   const qStems = qTokens.map((t) => new Set(stems(t).filter((x) => x === t || x.length >= MIN_STEM_MATCH)));
@@ -123,135 +134,167 @@ export function frequentImageWords(records: Peribahasa[], exclude: string[], lim
 }
 
 // ---------- Mode B: Carian Situasi ----------
+//
+// Layers 1-3 (normalise, cues, concepts) live in ./semantic. Here: retrieve only sayings attached to a
+// detected concept (layer 4), rank by how central that concept is to the saying and the sentence
+// (layer 5), and return nothing rather than something weak (layer 6). Word overlap only reorders
+// sayings that already fit; it can never bring a saying in, so "datang" cannot pull in "Orang luar".
 
-export type Strength = 'kuat' | 'sederhana' | 'lemah';
+export type Strength = 'kuat' | 'sederhana';
 
 export interface SituationResult {
   record: Peribahasa;
   score: number;
   strength: Strength;
-  /** Explanation that quotes the student's own words. */
+  /** Why this saying fits: the shared idea, not the learner's words echoed back. */
   sebab: string;
   /** Words from the student's text that drove the match. */
   matched: string[];
-  concept?: Concept;
+  concept: SituationConcept;
   alternatives: Peribahasa[];
 }
 
 export interface SituationResponse {
   results: SituationResult[];
-  /** True when nothing reached a moderate match; the UI says so instead of pretending. */
+  /** How the sentence was read, strongest first, shown to the learner as "Kami faham situasi ini tentang". */
+  understood: { id: string; label: string }[];
+  /** True when nothing fits well enough; the UI says so instead of pretending. */
   weak: boolean;
-  /** Words from the input that exist as keywords in the collection, to offer as searches. */
+  /** Words from the input that exist in sayings, to offer as keyword searches. */
   relatedTerms: string[];
 }
 
-interface ConceptHit { concept: Concept; weight: number; matched: string[] }
+/** A result must reach this share of the best result, so one strong match is not padded with weak ones. */
+const RELATIVE_FLOOR = 0.62;
+const RELATED_WEIGHT = 0.68;
+const MIN_CONCEPT_SCORE = 2;
+// Tuned on the dev and validation sets, on a flat part of the curve (see docs/situation-search-evaluation.md).
+const SIM_FLOOR = 0.55;
+const SIM_MARGIN = 0;
+const SIM_BAND = 0.02;
+const CUE_BONUS = 0.06;
 
-function matchConcepts(text: string): ConceptHit[] {
-  const n = ` ${normalize(text)} `;
-  const tokens = tokenize(text);
-  const tokenStems = tokens.map((t) => ({ t, s: new Set(stems(t)) }));
-  const hits: ConceptHit[] = [];
-  for (const concept of CONCEPTS) {
-    let weight = 0;
-    const matched: string[] = [];
-    for (const trigger of concept.triggers) {
-      const nt = normalize(trigger);
-      if (nt.includes(' ')) {
-        if (n.includes(` ${nt} `)) { weight += 2; matched.push(nt); }
-      } else {
-        const ts = new Set(stems(nt));
-        const hit = nt.includes('-')
-          ? tokenStems.find(({ t }) => t === nt)
-          : tokenStems.find(({ t, s }) => t === nt || (!STOPWORDS.has(t) && [...ts].some((x) => x.length >= MIN_STEM_MATCH && s.has(x))));
-        if (hit && !matched.includes(hit.t)) { weight += nt.includes('-') ? 2 : 1; matched.push(hit.t); }
-      }
-    }
-    if (weight > 0) hits.push({ concept, weight, matched });
+interface Link { conceptId: string; primary: boolean; rank: number }
+
+/** Inverted concept index: concept -> sayings, and saying -> concepts it must never be used for. */
+function linksFor(index: Indexed[]) {
+  const byConcept = new Map<string, { item: Indexed; link: Link }[]>();
+  for (const item of index) {
+    const s = item.r.semantik;
+    if (!s || item.r.sensitive || item.r.verificationStatus === 'perlu-semakan') continue;
+    for (const [conceptId, rank] of Object.entries(s.utama)) (byConcept.get(conceptId) ?? byConcept.set(conceptId, []).get(conceptId)!).push({ item, link: { conceptId, primary: true, rank } });
+    for (const [conceptId, rank] of Object.entries(s.berkaitan)) (byConcept.get(conceptId) ?? byConcept.set(conceptId, []).get(conceptId)!).push({ item, link: { conceptId, primary: false, rank } });
   }
-  return hits.sort((a, b) => b.weight - a.weight);
+  return byConcept;
+}
+
+const linkCache = new WeakMap<Indexed[], ReturnType<typeof linksFor>>();
+function links(index: Indexed[]) {
+  let l = linkCache.get(index);
+  if (!l) { l = linksFor(index); linkCache.set(index, l); }
+  return l;
+}
+
+/**
+ * Combines the two readings. Similarity sees the whole sentence, so it decides; a cue is explicit
+ * evidence and earns a bonus, which also lets similarity veto a cue that misfired on one word.
+ * Without similarity (offline, or the service is down) the cues stand on their own.
+ */
+function mergeHits(cues: ConceptHit[], semantic: SemanticReading | undefined): ConceptHit[] {
+  if (!semantic?.concepts.length) return cues;
+  const sim = new Map(semantic.concepts.map((c) => [c.id, c.sim]));
+  const cueById = new Map(cues.map((h) => [h.concept.id, h]));
+  const candidates = [...new Set([...sim.keys(), ...cueById.keys()])]
+    .map((id) => ({ id, final: (sim.get(id) ?? 0) + (cueById.has(id) ? CUE_BONUS : 0) }))
+    .filter((c) => CONCEPT_BY_ID.has(c.id) && c.final >= SIM_FLOOR && c.final - semantic.neutral >= SIM_MARGIN)
+    .sort((a, b) => b.final - a.final);
+  if (!candidates.length) return [];
+  const best = candidates[0].final;
+  const kept = candidates.filter((c) => c.final >= best - SIM_BAND);
+  const beaten = new Set(kept.flatMap((c) => CONCEPT_BY_ID.get(c.id)!.overrides ?? []));
+  return kept.filter((c) => !beaten.has(c.id)).slice(0, 2).map((c) => ({
+    concept: CONCEPT_BY_ID.get(c.id)!,
+    score: 3 - (best - c.final) * 10,
+    matched: cueById.get(c.id)?.matched ?? [],
+  }));
 }
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1).replace(/\.$/, '');
-const quoteList = (words: string[]) => words.slice(0, 3).map((w) => `“${w}”`).join(words.length > 2 ? ', ' : ' dan ');
 
-export function situationSearch(index: Indexed[], text: string, opts: { limit?: number; byId: Map<string, Peribahasa> }): SituationResponse {
-  const { byId } = opts;
-  const limit = opts.limit ?? 6;
+/** Sentence similarity from worker/situasi.ts. It only ever carries concept ids, never a saying. */
+export interface SemanticReading { neutral: number; concepts: { id: string; sim: number }[] }
+
+export function situationSearch(index: Indexed[], text: string, opts: { limit?: number; semantic?: SemanticReading } = {}): SituationResponse {
+  const limit = opts.limit ?? 5;
   const input = text.trim();
-  if (normalize(input).split(' ').length < 2) return { results: [], weak: true, relatedTerms: [] };
+  if (normalize(input).split(' ').length < 2) return { results: [], understood: [], weak: true, relatedTerms: [] };
 
-  const conceptHits = matchConcepts(input);
+  const hits = mergeHits(detectConcepts(input).filter((h) => h.score >= MIN_CONCEPT_SCORE), opts.semantic);
   const inputTokens = [...new Set(contentTokens(input).filter((t) => t.length > 2))];
-  const inputStems = inputTokens.map((t) => ({ t, s: stems(t) }));
+  const relatedTerms = inputTokens.filter((t) => index.some((i) => i.sayingTokens.includes(t))).slice(0, 5);
+  const understood = hits.slice(0, 3).map((h) => ({ id: h.concept.id, label: h.concept.label }));
+  if (!hits.length) return { results: [], understood: [], weak: true, relatedTerms };
 
-  // Document frequency for a light IDF weight on meaning words.
-  const df = new Map<string, number>();
-  for (const item of index) for (const s of item.maksudStems) df.set(s, (df.get(s) ?? 0) + 1);
-  const N = index.length;
+  const inputStems = new Set(inputTokens.flatMap(stems).filter((s) => s.length >= MIN_STEM_MATCH));
+  const top = hits[0].score;
+  const blocked = new Set(hits.flatMap((h) => byConceptAvoid(index, h.concept.id)));
 
-  type Acc = { score: number; conceptHit?: ConceptHit; conceptRank?: number; lexical: string[] };
+  type Acc = { item: Indexed; score: number; hit: ConceptHit; primary: boolean; covered: number };
   const acc = new Map<string, Acc>();
-  const get = (id: string) => acc.get(id) ?? (acc.set(id, { score: 0, lexical: [] }), acc.get(id)!);
-
-  for (const hit of conceptHits) {
-    hit.concept.ids.forEach((id, rank) => {
-      if (!byId.has(id)) return;
-      const a = get(id);
-      const add = hit.weight * (4 - Math.min(rank, 3) * 0.6);
-      if (!a.conceptHit || add > a.score) { a.conceptHit = hit; a.conceptRank = rank; }
-      a.score += add;
-    });
-  }
-
-  for (const item of index) {
-    if (item.r.sensitive) continue;
-    let lex = 0;
-    const words: string[] = [];
-    for (const { t, s } of inputStems) {
-      const hit = s.find((x) => (x === t || x.length >= MIN_STEM_MATCH) && (item.maksudStems.has(x) || item.keywordStems.has(x)));
-      if (hit && !words.includes(t)) {
-        lex += Math.log(1 + N / (df.get(hit) ?? 1));
-        words.push(t);
+  for (const hit of hits) {
+    const weight = hit.score / top;
+    for (const { item, link } of links(index).get(hit.concept.id) ?? []) {
+      if (blocked.has(item.r.id)) continue;
+      // Earlier in the curated list means a more central fit; related sayings stay below primary ones.
+      const s = weight * (link.primary ? 1 : RELATED_WEIGHT) * (1 - Math.min(link.rank, 6) * 0.035);
+      const cur = acc.get(item.r.id);
+      if (!cur) acc.set(item.r.id, { item, score: s, hit, primary: link.primary, covered: 1 });
+      else {
+        if (s > cur.score) { cur.score = s; cur.hit = hit; cur.primary = link.primary; }
+        cur.covered++;
       }
     }
-    if (words.length >= 1 && lex > 0) {
-      const a = get(item.r.id);
-      a.score += lex * 0.55 * (words.length >= 2 ? 1.4 : 1);
-      a.lexical = words;
-    }
   }
 
-  const ranked = [...acc.entries()]
-    .map(([id, a]) => ({ id, ...a }))
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score);
+  const ranked = [...acc.values()].map((a) => {
+    // A saying covering two of the detected ideas beats one covering only one. Shared meaning words
+    // and the curriculum are tie-breakers: small, and only for sayings already retrieved.
+    const overlap = [...a.item.maksudStems].filter((s) => inputStems.has(s)).length;
+    const score = a.score + (a.covered - 1) * 0.08 + Math.min(overlap, 3) * 0.015 + (a.item.r.tingkatan.length ? 0.01 : 0);
+    return { ...a, score };
+  }).sort((a, b) => b.score - a.score || a.item.r.id.localeCompare(b.item.r.id));
 
+  const best = ranked[0]?.score ?? 0;
   const results: SituationResult[] = [];
   const seen = new Set<string>();
+  // Two sayings that truly mean this are a better answer than those two plus looser relatives.
+  const strongEnough = new Set(ranked.filter((x) => x.primary && x.score >= best * RELATIVE_FLOOR).map((x) => x.item.r.id)).size >= 2;
   for (const x of ranked) {
-    const record = byId.get(x.id)!;
-    if (seen.has(x.id) || record.variants.some((v) => seen.has(v))) continue;
-    seen.add(x.id);
-    const conceptStrong = x.conceptHit && x.conceptHit.weight >= 2 && (x.conceptRank ?? 9) <= 1;
-    const strength: Strength = conceptStrong ? 'kuat' : (x.conceptHit && x.conceptHit.weight >= 2) || x.lexical.length >= 2 ? 'sederhana' : 'lemah';
-    const matched = x.conceptHit ? x.conceptHit.matched : x.lexical;
-    const maksud = lowerFirst(record.maksud);
-    const sebab = x.conceptHit
-      ? `Kamu menyebut ${quoteList(x.conceptHit.matched)}. Situasi ini menggambarkan ${x.conceptHit.concept.label}. Peribahasa ini bermaksud ${maksud}, jadi ia sesuai dengan keadaan tersebut.`
-      : `Perkataan ${quoteList(x.lexical)} dalam situasi kamu turut terdapat dalam maksud peribahasa ini: ${maksud}. Padanan ini berdasarkan kata kunci sahaja, jadi semak sama ada maksudnya benar-benar sesuai.`;
-    const alternatives = (x.conceptHit?.concept.ids ?? [])
-      .filter((id) => id !== x.id && byId.has(id))
-      .map((id) => byId.get(id)!)
-      .slice(0, 2);
-    results.push({ record, score: x.score, strength, sebab, matched, concept: x.conceptHit?.concept, alternatives });
+    const r = x.item.r;
+    if (x.score < best * RELATIVE_FLOOR || seen.has(r.id) || r.variants.some((v) => seen.has(v))) continue;
+    if (strongEnough && !x.primary) continue;
+    seen.add(r.id);
+    const strength: Strength = x.primary && x.hit.score >= 3 && x.score >= best * 0.8 ? 'kuat' : 'sederhana';
+    const alternatives = (links(index).get(x.hit.concept.id) ?? [])
+      .filter(({ item, link }) => link.primary && item.r.id !== r.id && !r.variants.includes(item.r.id) && !blocked.has(item.r.id))
+      .map(({ item }) => item.r);
+    results.push({
+      record: r, score: x.score, strength, matched: x.hit.matched, concept: x.hit.concept, alternatives,
+      sebab: `${x.hit.concept.why} Maksudnya: ${lowerFirst(r.maksud)}.`,
+    });
     if (results.length >= limit) break;
   }
-
-  const weak = !results.some((r) => r.strength !== 'lemah');
-  const relatedTerms = inputTokens.filter((t) => index.some((i) => i.sayingTokens.includes(t))).slice(0, 5);
-  return { results: weak ? results.slice(0, 3) : results.filter((r) => r.strength !== 'lemah').slice(0, limit), weak, relatedTerms };
+  // "Other options" should add something: never repeat a saying already on the page.
+  const shown = new Set(results.flatMap((x) => [x.record.id, ...x.record.variants]));
+  for (const x of results) x.alternatives = x.alternatives.filter((a) => !shown.has(a.id)).slice(0, 2);
+  return { results, understood, weak: !results.length, relatedTerms };
 }
+
+/** Sayings a concept must never surface, whatever else they match. */
+function byConceptAvoid(index: Indexed[], conceptId: string): string[] {
+  return index.filter((i) => i.r.semantik?.bukan.includes(conceptId)).map((i) => i.r.id);
+}
+
+export { CONCEPT_BY_ID };
 
 export const POPULAR_KEYWORDS = ['Air', 'Ayam', 'Padi', 'Harimau', 'Ular', 'Ilmu', 'Usaha', 'Masa', 'Guru', 'Keluarga', 'Kerjasama', 'Kesabaran'];

@@ -5,7 +5,7 @@ import { useGSAP } from '@gsap/react';
 import { ArrowRight, Compass, BookOpenText, Puzzle, Layers, PenLine } from 'lucide-react';
 import { Mascot, Wordmark } from '../../components/Mascot';
 import { Highlight } from '../../components/ui';
-import { RECORDS, BY_ID, THEMES } from '../../lib/data';
+import { RECORDS, THEMES } from '../../lib/data';
 import { buildIndex, situationSearch } from '../../lib/search';
 import { EMOJI_PUZZLES } from '../../content/emoji';
 import { useDocumentTitle, useReducedMotion } from '../../hooks/media';
@@ -28,7 +28,7 @@ export function Welcome() {
   const reduced = useReducedMotion();
 
   // The hero preview is a live result from the real situation engine, not a mock.
-  const match = useMemo(() => situationSearch(buildIndex(RECORDS), SAMPLE, { byId: BY_ID }).results[0], []);
+  const match = useMemo(() => situationSearch(buildIndex(RECORDS), SAMPLE).results[0], []);
   const stats = useMemo(() => ({
     total: RECORDS.length,
     prpm: RECORDS.filter((r) => r.verificationStatus === 'disahkan-prpm').length,
@@ -54,7 +54,10 @@ export function Welcome() {
     <div ref={scope} className="min-h-dvh bg-paper">
       <header className="mx-auto flex max-w-[1180px] items-center justify-between px-4 pt-[calc(16px+env(safe-area-inset-top))] sm:px-8">
         <Wordmark />
-        <Link to="/cari" className="btn btn-quiet">Terus ke carian</Link>
+        <div className="flex items-center gap-1">
+          <Link to="/cari" className="btn btn-quiet hidden sm:inline-flex">Terus ke carian</Link>
+          <Link to="/masuk" className="btn btn-secondary btn-sm">Log Masuk</Link>
+        </div>
       </header>
 
       <section className="mx-auto grid max-w-[1180px] gap-10 px-4 pb-14 pt-8 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:gap-x-12 lg:gap-y-8 lg:pb-20 lg:pt-10">
@@ -157,7 +160,7 @@ export function Welcome() {
       </section>
 
       <footer className="border-t border-line px-4 py-8 text-center text-[0.8125rem] text-ink-subtle">
-        LESTARI, prototaip Fasa 1. Kemajuan disimpan dalam pelayar ini sahaja.
+        LESTARI. Tanpa akaun, kemajuan disimpan dalam pelayar ini sahaja. <Link to="/daftar" className="font-[700] text-primary-ink">Daftar</Link> untuk simpan kemajuan dan masuk Papan Juara.
       </footer>
 
       <Onboarding open={onboarding} onClose={() => setOnboarding(false)} />

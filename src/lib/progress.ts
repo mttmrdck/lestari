@@ -191,9 +191,24 @@ export type ProgressEvent =
   | { type: 'achievement'; achievement: Achievement }
   | { type: 'goal' };
 
+/**
+ * What a signed-in learner just did, for the server's XP ledger. It carries no amount: the server
+ * prices every action itself (worker/xp.ts), so nothing the browser sends can inflate the leaderboard.
+ */
+export type XpClaim =
+  | { kind: 'quiz'; mode: QuizMode; recordId: string }
+  | { kind: 'quiz-done'; sessionId: string; total: number }
+  | { kind: 'review'; recordId: string }
+  | { kind: 'explore'; recordId: string }
+  | { kind: 'lesson'; lessonId: string; correct: number; total: number }
+  | { kind: 'daily'; day: DateKey; guesses: string[] };
+
 // ---------- Store ----------
 
 const STORAGE_KEY = 'lestari:v1';
+/** Which account's progress is on this device. Absent means the guest copy under STORAGE_KEY. */
+const ACCOUNT_KEY = 'lestari:akaun';
+const accountStorageKey = (userId: string) => `${STORAGE_KEY}:u:${userId}`;
 
 type Listener = () => void;
 
@@ -229,11 +244,11 @@ function sanitize(input: unknown): ProgressState {
 
 export interface LoadResult { state: ProgressState; notice: string | null }
 
-export function loadState(storage: Pick<Storage, 'getItem' | 'setItem'> | null): LoadResult {
+export function loadState(storage: Pick<Storage, 'getItem' | 'setItem'> | null, key = STORAGE_KEY): LoadResult {
   if (!storage) return { state: emptyState(), notice: 'Storan pelayar tidak tersedia. Kemajuan kamu tidak akan disimpan selepas halaman ditutup.' };
   let raw: string | null = null;
   try {
-    raw = storage.getItem(STORAGE_KEY);
+    raw = storage.getItem(key);
   } catch {
     return { state: emptyState(), notice: 'Storan pelayar disekat. Kemajuan kamu tidak akan disimpan.' };
   }
@@ -241,23 +256,28 @@ export function loadState(storage: Pick<Storage, 'getItem' | 'setItem'> | null):
   try {
     return { state: sanitize(JSON.parse(raw)), notice: null };
   } catch {
-    try { storage.setItem(`${STORAGE_KEY}:rosak:${Date.now()}`, raw); } catch { /* best effort */ }
+    try { storage.setItem(`${key}:rosak:${Date.now()}`, raw); } catch { /* best effort */ }
     return { state: emptyState(), notice: 'Data kemajuan yang tersimpan rosak, jadi kami mulakan semula. Salinan lama disimpan dalam pelayar.' };
   }
 }
 
 export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null, now: () => number = Date.now) {
-  const loaded = loadState(storage);
+  const readAccount = () => { try { return storage?.getItem(ACCOUNT_KEY) ?? null; } catch { return null; } };
+  let accountId = readAccount();
+  const activeKey = () => (accountId ? accountStorageKey(accountId) : STORAGE_KEY);
+  const loaded = loadState(storage, activeKey());
   let state = loaded.state;
   let storageNotice = loaded.notice;
   const listeners = new Set<Listener>();
   const eventListeners = new Set<(e: ProgressEvent) => void>();
+  const claimListeners = new Set<(c: XpClaim) => void>();
   let pendingEvents: ProgressEvent[] = [];
+  const claim = (c: XpClaim) => claimListeners.forEach((l) => l(c));
 
   const persist = () => {
     if (!storage) return;
     try {
-      storage.setItem(STORAGE_KEY, JSON.stringify(state));
+      storage.setItem(activeKey(), JSON.stringify(state));
     } catch {
       storageNotice = 'Kemajuan tidak dapat disimpan kerana storan pelayar penuh atau disekat.';
     }
@@ -311,6 +331,35 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
     dismissNotice: () => { storageNotice = null; listeners.forEach((l) => l()); },
     subscribe(l: Listener) { listeners.add(l); return () => { listeners.delete(l); }; },
     onEvent(l: (e: ProgressEvent) => void) { eventListeners.add(l); return () => { eventListeners.delete(l); }; },
+    onClaim(l: (c: XpClaim) => void) { claimListeners.add(l); return () => { claimListeners.delete(l); }; },
+
+    getAccountId: () => accountId,
+    /** True when this device already holds a copy of that account's progress. */
+    hasLocalCopy(userId: string) { try { return !!storage?.getItem(accountStorageKey(userId)); } catch { return false; } },
+
+    /**
+     * Switches whose progress is on screen, so two people sharing a browser never see each other's
+     * data. Pass `state` to replace the account's local copy, or omit it to keep the copy (or `carry`
+     * the guest's progress into a brand new account).
+     */
+    switchAccount(userId: string | null, opts: { state?: unknown; carry?: boolean } = {}) {
+      const previous = accountId;
+      const guest = state;
+      if (previous && previous !== userId) { try { storage?.removeItem(accountStorageKey(previous)); } catch { /* ignore */ } }
+      accountId = userId;
+      try {
+        if (userId) storage?.setItem(ACCOUNT_KEY, userId); else storage?.removeItem(ACCOUNT_KEY);
+      } catch { /* the choice just will not survive a reload */ }
+      if (opts.state) {
+        try { state = sanitize(opts.state); } catch { state = emptyState(); }
+      } else if (opts.carry) {
+        state = guest;
+      } else {
+        state = loadState(storage, activeKey()).state;
+      }
+      persist();
+      listeners.forEach((l) => l());
+    },
 
     setProfile(profile: Omit<Profile, 'createdAt'>) {
       commit({ ...state, profile: { ...profile, createdAt: state.profile?.createdAt ?? now() } });
@@ -326,8 +375,10 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
       const today = dateKey(now());
       const todayCount = Object.keys(state.awarded).filter((k) => k.startsWith(`explore:${today}:`)).length;
       let s: ProgressState = { ...state, explored: { ...state.explored, [id]: now() }, activity: pushActivity(state.activity, { t: now(), kind: 'explore', text: `Meneroka “${title}”` }) };
-      if (todayCount < XP.exploreDailyCap) [s] = award(s, `explore:${today}:${id}`, XP.explore, 'Peribahasa baharu diterokai');
+      let gained = 0;
+      if (todayCount < XP.exploreDailyCap) [s, gained] = award(s, `explore:${today}:${id}`, XP.explore, 'Peribahasa baharu diterokai');
       commit(s);
+      if (gained) claim({ kind: 'explore', recordId: id });
     },
 
     toggleFavourite(id: string) {
@@ -390,6 +441,7 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
         [s, gained] = award(s, `quiz:${dateKey(now())}:${mode}:${recordId}`, amount, 'Jawapan betul');
       }
       commit(s);
+      if (gained) claim({ kind: 'quiz', mode, recordId });
       return gained;
     },
 
@@ -408,6 +460,7 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
         activity: pushActivity(s.activity, { t: now(), kind: 'quiz', text: `Kuiz ${MODE_LABEL[summary.mode]}: ${summary.correct}/${summary.total} betul` }),
       };
       commit(s);
+      if (gained) claim({ kind: 'quiz-done', sessionId: summary.id, total: summary.total });
       return gained;
     },
 
@@ -421,8 +474,10 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
         counters: { ...state.counters, reviews: state.counters.reviews + 1 },
         activity: pushActivity(state.activity, { t: now(), kind: 'review', text: `Ulang kaji “${title}” (${rating})` }),
       });
-      [s] = award(s, `review:${dateKey(now())}:${id}`, XP.review, 'Ulang kaji kad');
+      let gained = 0;
+      [s, gained] = award(s, `review:${dateKey(now())}:${id}`, XP.review, 'Ulang kaji kad');
       commit(s);
+      if (gained) claim({ kind: 'review', recordId: id });
       return card;
     },
 
@@ -440,6 +495,7 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
       }
       s = { ...s, activity: pushActivity(s.activity, { t: now(), kind: 'quiz', text: passed ? `Lulus pelajaran “${title}” (${correct}/${total})` : `Mencuba pelajaran “${title}” (${correct}/${total})` }) };
       commit(s);
+      if (gained) claim({ kind: 'lesson', lessonId, correct, total });
       return { passed, gained };
     },
 
@@ -460,11 +516,12 @@ export function createStore(storage: Pick<Storage, 'getItem' | 'setItem' | 'remo
         activity: status !== 'playing' ? pushActivity(s.activity, { t: now(), kind: 'daily', text: status === 'won' ? `Berjaya meneka Peribahasa Hari Ini dalam ${guesses.length} cubaan` : 'Mencuba Peribahasa Hari Ini' }) : s.activity,
       };
       commit(s);
+      if (xp) claim({ kind: 'daily', day, guesses });
       return next;
     },
 
     reset() {
-      try { storage?.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      try { storage?.removeItem(activeKey()); } catch { /* ignore */ }
       commit(emptyState());
     },
   };

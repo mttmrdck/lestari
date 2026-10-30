@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 const DATA = JSON.parse(readFileSync(new URL('../src/data/peribahasa.json', import.meta.url), 'utf8'));
 const norm = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim();
 
-const BASE = process.argv[2] ?? 'http://localhost:4173';
+const BASE = process.argv[2] ?? 'http://localhost:8787';
 const SHOTS = process.argv[3] ?? 'e2e-shots';
 mkdirSync(SHOTS, { recursive: true });
 
@@ -30,7 +30,8 @@ async function newPage(viewport) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: 'no-preference', permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${viewport.width}: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`${viewport.width} console: ${m.text()}`); });
+  // The browser logs every 4xx; the negative auth checks below cause some on purpose.
+  page.on('console', (m) => { if (m.type() === 'error' && !/status of 4(01|09)/.test(m.text())) errors.push(`${viewport.width} console: ${m.text()}`); });
   return { ctx, page };
 }
 const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -123,15 +124,15 @@ const settle = (page) => page.waitForTimeout(900);
   await page.getByRole('radio', { name: 'Situasi' }).click();
   await page.getByLabel('Ceritakan situasi').fill('Ali baru mula belajar apabila peperiksaan tinggal seminggu.');
   await page.getByRole('button', { name: 'Cari padanan' }).click();
-  await page.waitForTimeout(600);
+  await page.locator('article h2, [data-testid="tiada-padanan"]').first().waitFor();
   const first = await page.locator('article h2').first().innerText();
   check('situation search ranks the right saying first', /Sudah terantuk baru tengadah/.test(first), first);
-  check('explanation quotes the student', await page.locator('article').first().getByText(/Kamu menyebut “baru mula”/).isVisible());
+  check('every result explains why it fits', await page.locator('article').first().getByText('Mengapa sesuai').isVisible() && await page.getByTestId('kefahaman').isVisible());
   await page.screenshot({ path: `${SHOTS}/flow-04-situasi.png`, fullPage: true });
   await page.getByLabel('Ceritakan situasi').fill('Saya suka warna biru dan lagu pop.');
   await page.getByRole('button', { name: 'Cari padanan' }).click();
-  await page.waitForTimeout(500);
-  check('weak situation is reported honestly', await page.getByText('Tiada padanan yang kukuh').isVisible());
+  await page.getByTestId('tiada-padanan').waitFor();
+  check('no-match situation is reported honestly', await page.getByText('Belum jumpa peribahasa yang benar-benar sepadan').isVisible() && (await page.locator('article').count()) === 0);
 
   // Detail, favourite, copy
   await page.goto(BASE + '/peribahasa/harapkan-pagar-pagar-makan-padi');
@@ -251,6 +252,228 @@ const settle = (page) => page.waitForTimeout(900);
   await ctx.close();
 }
 
+
+// ---------- 1b. Cari: every theme in the real UI ----------
+{
+  const { ctx, page } = await newPage({ width: 390, height: 844 });
+  const THEMES = [...new Set(DATA.flatMap((r) => r.themes))];
+  const count = async () => Number((await page.getByTestId('bilangan-hasil').innerText()).match(/\d+/)?.[0]);
+  await page.goto(BASE + '/cari');
+  await settle(page);
+  const tiles = await page.locator('button.card-link').count();
+  check('theme browser offers every theme', tiles === THEMES.length, String(tiles));
+  let good = 0;
+  for (let i = 0; i < tiles; i++) {
+    await page.goto(BASE + '/cari');
+    await page.locator('button.card-link').nth(i).click();
+    await page.getByTestId('bilangan-hasil').waitFor({ timeout: 4000 }).catch(() => {});
+    const theme = new URL(page.url()).searchParams.get('tema');
+    const expected = DATA.filter((r) => r.themes.includes(theme)).length;
+    const shown = await count().catch(() => -1);
+    const active = await page.getByRole('group', { name: 'Tapisan aktif' }).count().catch(() => 0);
+    const rows = await page.locator('a[href^="/peribahasa/"]').count();
+    if (shown === expected && active === 0 && rows > 0) good++; else check(`theme ${theme}`, false, `${shown} vs ${expected}`);
+  }
+  check('every theme shows all its sayings', good === tiles, `${good}/${tiles}`);
+  await page.goto(BASE + '/cari?tema=persahabatan');
+  await page.getByTestId('bilangan-hasil').waitFor();
+  check('selected theme stays visible', await page.getByRole('button', { name: 'Buang tema Persahabatan' }).isVisible());
+  await page.screenshot({ path: `${SHOTS}/flow-12-tema.png`, fullPage: true });
+  await page.getByLabel('Kata kunci peribahasa').fill('kawan');
+  await page.waitForTimeout(500);
+  const inter = await count();
+  check('keyword and theme intersect', inter > 0 && inter < 11, String(inter));
+  await page.getByLabel('Kata kunci peribahasa').fill('');
+  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'Buang tema Persahabatan' }).click();
+  await page.waitForTimeout(300);
+  check('removing the theme restores browsing', await page.getByRole('heading', { name: 'Terokai mengikut tema' }).isVisible() && !page.url().includes('tema='));
+  await page.goto(BASE + '/cari?tema=persahabatan&kategori=Perumpamaan');
+  await page.getByRole('radio', { name: 'Situasi' }).click();
+  await page.waitForTimeout(200);
+  await page.getByRole('radio', { name: 'Kata Kunci' }).click();
+  await page.waitForTimeout(300);
+  check('switching modes leaves no stale filter', !/tema=|kategori=/.test(page.url()) && await page.getByRole('heading', { name: 'Terokai mengikut tema' }).isVisible());
+  await page.goto(BASE + '/cari?tema=rekaan');
+  await settle(page);
+  check('an unknown theme in the URL is ignored', await page.getByRole('heading', { name: 'Terokai mengikut tema' }).isVisible());
+  await page.goto(BASE + '/cari?mode=situasi&q=' + encodeURIComponent('Kawan itu berkawan dengan saya kerana kepentingan sendiri.'));
+  await page.locator('article h2').first().waitFor();
+  const friend = await page.locator('article h2').allInnerTexts();
+  check('self-interest is not answered with close friendship', !friend.some((t) => /isi dengan kuku/.test(t)) && friend.some((t) => /Lagi lauk|Habis madu|Guna-guna/.test(t)), friend.join(' / '));
+  await page.screenshot({ path: `${SHOTS}/flow-13-situasi-kawan.png`, fullPage: true });
+  await ctx.close();
+}
+
+// ---------- 1c. Accounts ----------
+{
+  const { ctx, page } = await newPage({ width: 390, height: 844 });
+  const id = `uji${Date.now() % 1000000}`;
+  const email = `${id}@contoh.my`;
+  const password = 'rahsia123';
+  const pwField = () => page.getByLabel('Kata laluan', { exact: true });
+
+  await page.goto(BASE + '/akaun');
+  await page.waitForURL(/\/masuk\?ke=/);
+  check('account page redirects guests to login', page.url().includes('/masuk?ke=/akaun'));
+  await page.getByRole('button', { name: 'Jom Masuk' }).click();
+  check('empty login shows errors', await page.getByText('Isikan e-mel atau nama pengguna.').isVisible() && await page.getByText('Isikan kata laluan.').isVisible());
+
+  await page.getByRole('link', { name: 'Daftar', exact: true }).click();
+  await page.getByLabel('Nama paparan').waitFor();
+  await page.getByLabel('E-mel').fill('bukan-emel');
+  await page.getByLabel('E-mel').blur();
+  await page.getByText(/e-mel yang sah/).waitFor({ timeout: 3000 }).catch(() => {});
+  check('invalid email is flagged inline', await page.getByText(/e-mel yang sah/).isVisible());
+  await page.getByLabel('Nama paparan').fill('Aina Sofea');
+  await page.getByLabel('Nama pengguna').fill(id);
+  await page.getByLabel('E-mel').fill(email);
+  await pwField().fill(password);
+  await page.getByLabel('Sahkan kata laluan').fill('lainpula1');
+  await page.getByLabel('Sahkan kata laluan').blur();
+  check('password mismatch is flagged', await page.getByText('Kata laluan tidak sama.').isVisible());
+  await page.getByLabel('Sahkan kata laluan').fill(password);
+  await page.getByText('Nama pengguna ini tersedia.').waitFor();
+  check('username availability is checked live', true);
+  await page.screenshot({ path: `${SHOTS}/flow-14-daftar.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Cipta Akaun' }).click();
+  await page.getByTestId('kod-pemulihan').waitFor({ timeout: 6000 });
+  const recovery = await page.getByTestId('kod-pemulihan').innerText();
+  check('registration shows the recovery code before anything else', /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(recovery), recovery);
+  check('recovery code must be acknowledged', await page.getByRole('button', { name: 'Jom Mula' }).isDisabled());
+  await page.getByLabel('Saya sudah simpan kod ini').check();
+  await page.getByRole('button', { name: 'Jom Mula' }).click();
+  await page.getByRole('heading', { name: 'Aina Sofea' }).waitFor();
+  check('registration returns to the page that asked for it', await page.getByRole('heading', { name: 'Aina Sofea' }).isVisible());
+  await page.goto(BASE + '/');
+  await page.getByText(/Aina Sofea!/).first().waitFor();
+  check('new account gets a dashboard with its name', true);
+  const cookies = await ctx.cookies();
+  const session = cookies.find((c) => c.name.includes('lestari_s'));
+  check('session cookie is HttpOnly', !!session?.httpOnly && session.sameSite === 'Lax');
+  check('session is not readable from scripts', !(await page.evaluate(() => document.cookie)).includes('lestari_s'));
+
+  await page.reload();
+  await settle(page);
+  check('session survives a refresh', await page.getByText(/Aina Sofea!/).first().isVisible());
+  await page.goto(BASE + '/masuk');
+  await page.waitForURL((u) => !u.pathname.startsWith('/masuk'));
+  check('signed-in learners skip the login page', true);
+
+  // XP: earned in the app, stored on the server.
+  await page.goto(BASE + '/kuiz/maksud');
+  await settle(page);
+  const answers = DATA.map((r) => r);
+  for (let i = 0; i < 8; i++) {
+    const prompt = norm(await page.locator('main .saying').first().innerText());
+    const rec = answers.find((r) => r.normalizedText === prompt);
+    if (!rec) console.log('  (prompt not matched)', prompt);
+    const opts = page.locator('ol[aria-label="Pilihan jawapan"] button');
+    const labels = (await opts.allInnerTexts()).map((t) => t.replace(/^\d+\s*/, '').trim());
+    const pick = labels.findIndex((l) => norm(l).includes(norm(rec?.maksud ?? '?')));
+    await opts.nth(Math.max(0, pick)).click();
+    await page.waitForTimeout(150);
+    await page.getByRole('button', { name: /Soalan seterusnya|Lihat keputusan/ }).click();
+    await page.waitForTimeout(150);
+  }
+  await page.waitForTimeout(1600);
+  const localXp = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)).xpTotal, await page.evaluate(() => `lestari:v1:u:${localStorage.getItem('lestari:akaun')}`));
+  const ledger = await page.evaluate(() => fetch('/api/papan-juara?tempoh=minggu&demo=0').then((r) => r.json()));
+  check('server ledger matches the XP earned', ledger.you?.xp === localXp && localXp >= 80, `${ledger.you?.xp} vs ${localXp}`);
+  const cheat = await page.evaluate(() => fetch('/api/xp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ events: [{ kind: 'quiz', mode: 'maksud', recordId: 'rekaan', amount: 100000 }, { kind: 'lesson', lessonId: 'rekaan', correct: 1, total: 1 }] }) }).then((r) => r.json()));
+  check('forged XP is rejected', cheat.results.every((x) => x.status === 'rejected') && cheat.total === ledger.you.xp, JSON.stringify(cheat.results));
+  const tamper = await page.evaluate(() => fetch('/api/kemajuan', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: { version: 1, xpTotal: 999999 } }) }).then(() => fetch('/api/papan-juara?tempoh=minggu&demo=0')).then((r) => r.json()));
+  check('editing progress does not change the ranking', tamper.you.xp === ledger.you.xp);
+  // Put the real snapshot back so the rest of the flow sees it.
+  await page.evaluate(async () => { const key = `lestari:v1:u:${localStorage.getItem('lestari:akaun')}`; await fetch('/api/kemajuan', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: JSON.parse(localStorage.getItem(key)) }) }); });
+
+  // Leaderboard
+  await page.goto(BASE + '/papan-juara');
+  await page.getByTestId('kedudukan-kamu').waitFor();
+  await page.waitForTimeout(1600);
+  check('leaderboard shows the learner', (await page.getByTestId('kedudukan-kamu').innerText()).includes('Aina Sofea'));
+  const bar = await page.getByTestId('kedudukan-kamu').boundingBox();
+  check('own rank stays pinned inside the viewport', !!bar && bar.y >= 0 && bar.y + bar.height <= 844, JSON.stringify(bar));
+  const demoRows = await page.locator('[data-testid^="podium-"], li[data-key]').allInnerTexts();
+  check('every demo profile is labelled', demoRows.filter((t) => /Sang Kancil|Mak Tempua|Pak Belang|Cik Merbah/.test(t)).every((t) => /Demo/.test(t)));
+  check('podium has three ranks', (await page.locator('[data-testid^="podium-"]').count()) === 3);
+  await page.screenshot({ path: `${SHOTS}/flow-15-papan-juara.png`, fullPage: false });
+  await page.getByRole('radio', { name: 'Keseluruhan' }).click();
+  await page.waitForTimeout(1200);
+  await page.getByRole('radio', { name: 'Bulan Ini' }).click();
+  await page.waitForTimeout(1200);
+  check('period filters work', await page.getByTestId('podium-1').isVisible());
+  await page.getByRole('button', { name: 'Sembunyikan demo' }).click();
+  await page.waitForTimeout(800);
+  const realOnly = await page.evaluate(() => document.querySelector('main').innerText);
+  check('demo profiles can be hidden', !/Sang Kancil/.test(realOnly) && /Aina Sofea/.test(realOnly));
+  await page.reload();
+  await page.getByTestId('kedudukan-kamu').waitFor();
+  check('rank survives a refresh', true);
+
+  // Sign out, wrong password, sign in, second device
+  await page.goto(BASE + '/akaun');
+  await page.getByRole('button', { name: 'Log Keluar' }).click();
+  await page.getByRole('heading', { name: /Fahami Makna|Selamat/ }).first().waitFor();
+  const afterOut = await page.evaluate(() => fetch('/api/kemajuan').then((r) => r.status));
+  check('logout ends the session on the server', afterOut === 401);
+  check('logout removes this account from the device', !(await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes(':u:')))));
+  await page.goto(BASE + '/masuk');
+  await page.getByLabel('E-mel atau nama pengguna').fill(email);
+  await pwField().fill('salahsekali1');
+  await page.getByRole('button', { name: 'Jom Masuk' }).click();
+  await page.getByText(/tidak betul/).waitFor();
+  check('wrong password shows a clear error', true);
+  await page.screenshot({ path: `${SHOTS}/flow-16-salah.png`, fullPage: true });
+  await pwField().fill(password);
+  await page.getByRole('button', { name: 'Jom Masuk' }).click();
+  await page.getByText(/Aina Sofea!/).first().waitFor();
+  const xpBack = await page.getByRole('link', { name: /XP keseluruhan/ }).first().getAttribute('aria-label');
+  check('progress comes back after signing in', parseInt(xpBack) >= 80, xpBack);
+
+  await ctx.clearCookies();
+  await page.reload();
+  await settle(page);
+  check('an ended session returns to guest with a notice', await page.getByText(/Sesi kamu telah tamat/).isVisible());
+
+  await page.goto(BASE + '/daftar');
+  await page.getByLabel('Nama paparan').fill('Orang Lain');
+  await page.getByLabel('Nama pengguna').fill(`${id}x`);
+  await page.getByLabel('E-mel').fill(email);
+  await pwField().fill(password);
+  await page.getByLabel('Sahkan kata laluan').fill(password);
+  await page.getByRole('button', { name: 'Cipta Akaun' }).click();
+  await page.getByText('E-mel ini sudah didaftarkan').waitFor();
+  check('duplicate email is refused', true);
+
+  await page.goto(BASE + '/lupa-kata-laluan');
+  await page.getByLabel('E-mel atau nama pengguna').fill(id);
+  await page.getByLabel('Kod pemulihan').fill('AAAA-AAAA-AAAA-AAAA');
+  await page.getByLabel('Kata laluan baharu').fill('baharu123');
+  await page.getByRole('button', { name: 'Pulihkan Akaun' }).click();
+  await page.getByText(/kod pemulihan tidak betul/).waitFor();
+  check('a wrong recovery code is refused', true);
+  await page.getByLabel('Kod pemulihan').fill(recovery);
+  await page.getByRole('button', { name: 'Pulihkan Akaun' }).click();
+  await page.getByTestId('kod-pemulihan').waitFor();
+  check('the recovery code resets the password and rotates', (await page.getByTestId('kod-pemulihan').innerText()) !== recovery);
+  await ctx.close();
+}
+
+// ---------- 1d. Offline: the API is down ----------
+{
+  const { ctx, page } = await newPage({ width: 390, height: 844 });
+  await page.route('**/api/**', (r) => r.abort());
+  await page.goto(BASE + '/cari?mode=situasi&q=' + encodeURIComponent('Dia sangat sombong dengan kawan-kawannya.'));
+  await page.locator('article h2').first().waitFor({ timeout: 8000 });
+  check('situation search still works without the server', await page.getByText(/peta konsep sahaja/).isVisible());
+  await page.goto(BASE + '/papan-juara');
+  await page.getByText('Papan Juara tidak dapat dimuatkan.').waitFor({ timeout: 13000 });
+  check('leaderboard explains when it cannot load', true);
+  await ctx.close();
+  { const kept = errors.filter((e) => !/ERR_FAILED|Failed to fetch/.test(e)); errors.length = 0; errors.push(...kept); }
+}
+
 // ---------- Reduced motion ----------
 {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
@@ -265,7 +488,7 @@ const settle = (page) => page.waitForTimeout(900);
 }
 
 // ---------- 2. Layout at four widths ----------
-const ROUTES = ['/', '/laluan', '/simpanan', '/pelajaran/asas-1', '/cari', '/cari?mode=kata&q=ayam', '/cari?mode=situasi&q=Semua%20ahli%20kelas%20bergotong-royong%20membersihkan%20kelas%20bersama-sama.', '/peribahasa/sudah-terantuk-baru-tengadah', '/kuiz', '/kuiz/emoji', '/kad-imbas', '/profil', '/harian', '/tentang'];
+const ROUTES = ['/masuk', '/daftar', '/lupa-kata-laluan', '/papan-juara', '/', '/laluan', '/simpanan', '/pelajaran/asas-1', '/cari', '/cari?mode=kata&q=ayam', '/cari?mode=situasi&q=Semua%20ahli%20kelas%20bergotong-royong%20membersihkan%20kelas%20bersama-sama.', '/peribahasa/sudah-terantuk-baru-tengadah', '/kuiz', '/kuiz/emoji', '/kad-imbas', '/profil', '/harian', '/tentang'];
 for (const vp of [{ width: 375, height: 812 }, { width: 430, height: 932 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
   const { ctx, page } = await newPage(vp);
   // Seed a profile so routes render the app shell; welcome is captured separately.

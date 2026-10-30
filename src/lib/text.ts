@@ -73,7 +73,7 @@ export function stems(word: string): string[] {
 function stripPrefix(w: string): string[] {
   const r: string[] = [];
   const rules: [string, (rest: string) => string[]][] = [
-    ['memper', (s) => [s]],
+    ['memper', (s) => [s, 'per' + s]],
     ['mempel', (s) => ['l' + s]],
     ['meny', (s) => ['s' + s]],
     ['meng', (s) => [s, 'k' + s]],

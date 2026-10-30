@@ -36,6 +36,10 @@ colors:
   on-night: "#F4FAFF"
   on-night-muted: "#B9D3EE"
   casque: "#FF8A3D"
+  medal-silver: "#C6D2DA"
+  medal-silver-soft: "#EEF2F5"
+  medal-bronze: "#E6A772"
+  medal-bronze-soft: "#FBEADB"
 typography:
   display:
     fontFamily: Nunito Variable
@@ -161,6 +165,18 @@ components:
   bayu-casque:
     backgroundColor: "{colors.casque}"
     textColor: "{colors.ink}"
+  medal-silver:
+    backgroundColor: "{colors.medal-silver}"
+    textColor: "{colors.ink}"
+  medal-silver-row:
+    backgroundColor: "{colors.medal-silver-soft}"
+    textColor: "{colors.ink}"
+  medal-bronze:
+    backgroundColor: "{colors.medal-bronze}"
+    textColor: "{colors.ink}"
+  medal-bronze-row:
+    backgroundColor: "{colors.medal-bronze-soft}"
+    textColor: "{colors.ink}"
 ---
 
 # LESTARI design system: Hutan Ceria
@@ -184,6 +200,7 @@ Colour has a job; nothing is coloured at random.
 - **Red (#B33232)** is reserved for wrong answers and errors.
 - **Night sky (#1E3A5F)** is the daily challenge surface, sprinkled with stars.
 - **Warm cream (#FFFDF5)** is the page; cards are white with a 2px warm border.
+- **Medals** appear only on Papan Juara: sunshine for gold, **silver (#C6D2DA)** and **bronze (#E6A772)** with their darker edges. Ink text on all three.
 
 ## Typography
 
@@ -215,6 +232,8 @@ Depth is tactile, not blurry: controls and tiles sit on a solid **bottom edge** 
 - **Feedback bar:** fixed at the bottom; green with Bayu cheering or red with Bayu encouraging, the correct answer and the explanation, then *Teruskan*.
 - **Activity tile:** its own soft colour, an icon block in the strong colour, title, short description.
 - **Badges:** illustrated shields per achievement; locked ones are grey with a lock and a progress bar.
+- **Auth screens:** the night hill scene with Bayu on one side and the form on the other. Bayu follows the email being typed, covers his eye for the password, peeks when it is shown, cheers on success and encourages on error.
+- **Papan Juara:** a podium of three different heights (first in the centre) in medal colours, then rank rows. The learner's own row is sky blue; if it is off screen it stays pinned as "Kedudukan Kamu". Demo profiles always carry a "Demo" tag.
 
 ## Motion
 
@@ -231,6 +250,9 @@ Motion signals state and celebrates real learning; it never blocks reading.
 | Bayu idle | float and occasional blink | 3.6s / 5.2s loops |
 | XP and score | count up from the previous value | 700–900ms |
 | Lesson results, achievement | GSAP timeline, confetti on first pass, badge pop | ≤ 1.7s |
+| Podium entrance | columns rise from the floor, avatars pop, crown drops | ≤ 1.3s |
+| Ranking rows | stagger in; a filter change moves rows to their new place (FLIP) | 450ms |
+| Reaching the top three | confetti, once per period | ≤ 1.7s |
 
 Easing tokens: `--ease-out` (0.23, 1, 0.32, 1), `--ease-in-out` (0.77, 0, 0.175, 1), `--ease-spring` (0.34, 1.56, 0.64, 1). CSS handles presses, transitions and loops; GSAP (`useGSAP`, scoped) handles the welcome, dashboard entrance and results timelines. `prefers-reduced-motion: reduce` stops loops, confetti and count-ups.
 
@@ -241,4 +263,4 @@ Easing tokens: `--ease-out` (0.23, 1, 0.32, 1), `--ease-in-out` (0.77, 0, 0.175,
 - **Do** label provenance ("Disemak dengan PRPM", "Contoh oleh LESTARI", "anggaran").
 - **Don't** use the Duolingo owl, logo or illustrations, or emoji as interface icons (emoji are Kuiz Emoji content only).
 - **Don't** add confetti to ordinary clicks, animate layout properties, or loop motion near text being read.
-- **Don't** call local matching "AI".
+- **Don't** call local matching "AI". Situation search says plainly what it uses: a concept map plus a sentence-similarity model that chooses concepts, never sayings.

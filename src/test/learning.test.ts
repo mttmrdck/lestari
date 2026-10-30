@@ -270,3 +270,79 @@ describe('learning path', () => {
     expect(store.getState().achievements['mula-melangkah']).toBe(NOW);
   });
 });
+
+describe('accounts on one device', () => {
+  const memory = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), keys: () => [...m.keys()] };
+  };
+  const answer = (store: ReturnType<typeof createStore>, recordId: string) => store.answerQuiz({ sessionId: 's', questionKey: recordId, mode: 'maksud', recordId, correct: true });
+
+  it('keeps two accounts and the guest apart', () => {
+    const storage = memory();
+    const store = createStore(storage);
+    answer(store, 'guest-saying');
+    store.switchAccount('aina');
+    expect(store.getState().xpTotal).toBe(0);
+    answer(store, 'aina-saying');
+    store.switchAccount('budi');
+    expect(store.getState().xpTotal).toBe(0);
+    store.switchAccount(null);
+    expect(store.getState().answers['guest-saying']).toBeTruthy();
+    expect(store.getState().answers['aina-saying']).toBeUndefined();
+  });
+
+  it('carries guest progress into a brand new account', () => {
+    const store = createStore(memory());
+    answer(store, 'x');
+    const xp = store.getState().xpTotal;
+    store.switchAccount('baru', { carry: true });
+    expect(store.getState().xpTotal).toBe(xp);
+  });
+
+  it('removes an account copy from the device on sign-out', () => {
+    const storage = memory();
+    const store = createStore(storage);
+    store.switchAccount('aina');
+    answer(store, 'x');
+    expect(store.hasLocalCopy('aina')).toBe(true);
+    store.switchAccount(null);
+    expect(store.hasLocalCopy('aina')).toBe(false);
+  });
+
+  it('reopens on the signed-in account after a reload', () => {
+    const storage = memory();
+    const store = createStore(storage);
+    store.switchAccount('aina');
+    answer(store, 'x');
+    const reopened = createStore(storage);
+    expect(reopened.getAccountId()).toBe('aina');
+    expect(reopened.getState().answers.x).toBeTruthy();
+  });
+
+  it('loads a server copy and tolerates a damaged one', () => {
+    const store = createStore(memory());
+    store.switchAccount('aina', { state: { ...emptyState(), xpTotal: 77 } });
+    expect(store.getState().xpTotal).toBe(77);
+    store.switchAccount('budi', { state: { rosak: true } });
+    expect(store.getState().xpTotal).toBe(0);
+  });
+});
+
+describe('XP claims for the server', () => {
+  it('reports what happened, never an amount, and only when XP was earned', () => {
+    const store = createStore(null);
+    const claims: unknown[] = [];
+    store.onClaim((c) => claims.push(c));
+    store.answerQuiz({ sessionId: 's', questionKey: 'a', mode: 'konteks', recordId: 'a', correct: true });
+    store.answerQuiz({ sessionId: 's', questionKey: 'b', mode: 'maksud', recordId: 'b', correct: false });
+    store.answerQuiz({ sessionId: 's2', questionKey: 'a', mode: 'konteks', recordId: 'a', correct: true }); // same saying, mode and day
+    store.review('c', 'mudah', 'C');
+    store.explore('d', 'D');
+    expect(claims).toEqual([
+      { kind: 'quiz', mode: 'konteks', recordId: 'a' },
+      { kind: 'review', recordId: 'c' },
+      { kind: 'explore', recordId: 'd' },
+    ]);
+  });
+});

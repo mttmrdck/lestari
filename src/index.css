@@ -60,6 +60,13 @@
   --color-on-night: #f4faff;
   --color-on-night-muted: #b9d3ee;
   --color-casque: #ff8a3d;
+  /* Medals: leaderboard ranks only. Gold is the sunshine reward colour. */
+  --color-medal-silver: #c6d2da;
+  --color-medal-silver-edge: #9fb0bb;
+  --color-medal-silver-soft: #eef2f5;
+  --color-medal-bronze: #e6a772;
+  --color-medal-bronze-edge: #c07f47;
+  --color-medal-bronze-soft: #fbeadb;
   --color-mascot-shadow: rgb(20 30 40 / 0.25);
 
   --font-display: 'Nunito Variable', ui-rounded, ui-sans-serif, system-ui, sans-serif;
@@ -367,6 +374,19 @@
   .wiggle {
     animation: wiggle 520ms var(--ease-out) both;
   }
+  .bayu-look,
+  .bayu-cover {
+    transition:
+      transform 260ms var(--ease-spring),
+      opacity 160ms ease;
+    transform-box: view-box;
+  }
+  .spin {
+    animation: spin 800ms linear infinite;
+  }
+  .row-you {
+    animation: row-glow 1.2s var(--ease-out) 1 both;
+  }
   .node-pulse {
     animation: node-pulse 2.4s ease-in-out infinite;
   }
@@ -381,6 +401,22 @@
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes row-glow {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
 @keyframes rise-in {
   from {
     opacity: 0;

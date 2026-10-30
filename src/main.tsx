@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import './index.css';
 import { StoreProvider } from './app/store';
+import { AuthProvider } from './app/auth';
 import { Layout } from './app/Layout';
 import { HomeRoute } from './features/home/HomeRoute';
 import { RouteError } from './features/misc/RouteError';
@@ -23,6 +24,10 @@ const LessonPage = lazy(() => import('./features/lesson/LessonPage'));
 const PathPage = lazy(() => import('./features/path/PathPage'));
 const SavedPage = lazy(() => import('./features/favourites/SavedPage'));
 const NotFound = lazy(() => import('./features/misc/NotFound'));
+const AuthPage = lazy(() => import('./features/auth/AuthPage'));
+const RecoverPage = lazy(() => import('./features/auth/RecoverPage'));
+const AccountPage = lazy(() => import('./features/auth/AccountPage'));
+const LeaderboardPage = lazy(() => import('./features/leaderboard/LeaderboardPage'));
 
 const router = createBrowserRouter([
   {
@@ -42,6 +47,11 @@ const router = createBrowserRouter([
       { path: 'pelajaran/:id', element: <LessonPage /> },
       { path: 'laluan', element: <PathPage /> },
       { path: 'simpanan', element: <SavedPage /> },
+      { path: 'masuk', element: <AuthPage mode="masuk" /> },
+      { path: 'daftar', element: <AuthPage mode="daftar" /> },
+      { path: 'lupa-kata-laluan', element: <RecoverPage /> },
+      { path: 'akaun', element: <AccountPage /> },
+      { path: 'papan-juara', element: <LeaderboardPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },
@@ -50,7 +60,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StoreProvider>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </StoreProvider>
   </StrictMode>,
 );

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { Pencil, Trash2, Bookmark, ArrowRight } from 'lucide-react';
+import { Pencil, Trash2, Bookmark, ArrowRight, Trophy, UserRoundCheck, LogIn } from 'lucide-react';
 import { AchievementBadge } from '../../components/Badge';
 import { useProgress, useStore } from '../../app/store';
+import { useAuth } from '../../app/auth';
 import { ACHIEVEMENTS, currentStreak, longestStreak, masteredIds, quizAccuracy, isMastered } from '../../lib/progress';
 import { addDays, dateKey } from '../../lib/date';
 import { RECORDS, BY_ID } from '../../lib/data';
@@ -17,6 +18,7 @@ const DAY_SHORT = ['Ahd', 'Isn', 'Sel', 'Rab', 'Kha', 'Jum', 'Sab'];
 export default function ProfilePage() {
   useDocumentTitle('Profil');
   const store = useStore();
+  const { user } = useAuth();
   const s = useProgress((x) => x);
   const [editing, setEditing] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -49,7 +51,17 @@ export default function ProfilePage() {
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}><Pencil className="size-4" aria-hidden />{s.profile ? 'Ubah profil' : 'Buat profil'}</button>
       </header>
-      <p className="pt-1 text-[0.8125rem] text-ink-subtle">Kemajuan disimpan dalam pelayar ini sahaja dan tidak diselaraskan ke peranti lain.</p>
+      <p className="pt-1 text-[0.8125rem] text-ink-subtle">{user ? `Log masuk sebagai @${user.username}. Kemajuan diselaraskan ke akaun kamu.` : 'Kemajuan disimpan dalam pelayar ini sahaja dan tidak diselaraskan ke peranti lain.'}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Link to="/papan-juara" className="card card-link flex items-center gap-3 p-4 no-underline">
+          <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-lavender text-on-lavender"><Trophy className="size-5" strokeWidth={2.6} aria-hidden /></span>
+          <span className="min-w-0"><span className="block font-[800]">Papan Juara</span><span className="block text-[0.8125rem] text-ink-muted">Lihat kedudukan pelajar LESTARI</span></span>
+        </Link>
+        <Link to={user ? '/akaun' : '/masuk'} className="card card-link flex items-center gap-3 p-4 no-underline">
+          <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-sky text-on-sky">{user ? <UserRoundCheck className="size-5" strokeWidth={2.6} aria-hidden /> : <LogIn className="size-5" strokeWidth={2.6} aria-hidden />}</span>
+          <span className="min-w-0"><span className="block font-[800]">{user ? 'Akaun kamu' : 'Log masuk'}</span><span className="block text-[0.8125rem] text-ink-muted">{user ? 'Kata laluan, log keluar dan pemadaman akaun' : 'Simpan kemajuan dan masuk Papan Juara'}</span></span>
+        </Link>
+      </div>
 
       <SectionTitle>Kemajuan</SectionTitle>
       <dl className="card grid grid-cols-2 gap-x-6 gap-y-6 p-5 sm:grid-cols-3 sm:p-6 lg:grid-cols-6">
@@ -153,7 +165,7 @@ export default function ProfilePage() {
       <div className="card mt-3 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-[650]">Padam semua kemajuan</p>
-          <p className="text-[0.875rem] text-ink-muted">XP, streak, kad imbas dan kegemaran dalam pelayar ini akan dipadam.</p>
+          <p className="text-[0.875rem] text-ink-muted">XP, streak, kad imbas dan kegemaran akan dipadam.{user ? ' XP dalam Papan Juara kekal.' : ' Hanya dalam pelayar ini.'}</p>
         </div>
         <button type="button" className="btn btn-secondary btn-sm text-coral" onClick={() => setConfirmReset(true)}><Trash2 className="size-4" aria-hidden />Padam data</button>
       </div>

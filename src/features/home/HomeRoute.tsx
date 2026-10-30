@@ -151,6 +151,12 @@ function Home() {
             <Link to="/harian" className="btn btn-sky relative mt-4 w-full">{dailyDone ? 'Lihat jawapan' : 'Main sekarang'}</Link>
           </section>
 
+          <Link to="/papan-juara" className="flex items-center gap-3 rounded-[18px] border-2 border-lavender bg-lavender-soft p-4 text-lavender-ink no-underline shadow-[0_4px_0_var(--color-lavender)] transition-transform duration-150 active:translate-y-[4px] active:shadow-none">
+            <span className="grid size-11 shrink-0 place-items-center rounded-[12px] bg-lavender text-on-lavender"><Trophy className="size-6" strokeWidth={2.6} aria-hidden /></span>
+            <span className="min-w-0 flex-1"><span className="block text-[1.0625rem] font-[900] leading-tight text-ink">Papan Juara</span><span className="block text-[0.8125rem] font-[750]">Siapa paling konsisten minggu ini?</span></span>
+            <ArrowRight className="size-5 shrink-0" aria-hidden />
+          </Link>
+
           {/* Activities */}
           <section aria-labelledby="aktiviti">
             <h2 id="aktiviti" className="mb-3 text-[1.375rem] font-[900]">Aktiviti pantas</h2>

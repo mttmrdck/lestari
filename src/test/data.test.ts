@@ -3,7 +3,6 @@ import { RECORDS, BY_ID, LEARNABLE, CORE } from '../lib/data';
 import { validateRecords, checkReferences } from '../lib/validate';
 import { EMOJI_PUZZLES } from '../content/emoji';
 import { SITUATIONS } from '../content/situations';
-import { CONCEPTS } from '../content/concepts';
 import { CONTRASTS } from '../content/contrasts';
 import { KATEGORI } from '../types/peribahasa';
 import { slugify } from '../lib/text';
@@ -59,7 +58,7 @@ describe('knowledge base', () => {
     const refs = [
       ...EMOJI_PUZZLES.map((p) => p.answer),
       ...SITUATIONS.flatMap((s) => [s.answer, ...s.distractors]),
-      ...CONCEPTS.flatMap((c) => c.ids),
+      ...RECORDS.filter((r) => r.semantik).map((r) => r.id),
       ...CONTRASTS.flatMap((c) => [c.a, c.b]),
     ];
     expect(checkReferences('curated content', refs, ids)).toEqual([]);

@@ -10,6 +10,10 @@ interface Props {
   label?: string;
   /** Gentle float and blink. Disabled automatically under prefers-reduced-motion (global CSS). */
   idle?: boolean;
+  /** Wing over the eye: 'full' hides it (password typing), 'peek' leaves a gap (password shown). */
+  cover?: 'none' | 'full' | 'peek';
+  /** Where Bayu looks, -1 (left) to 1 (right); follows typing on the sign-in form. */
+  look?: number;
 }
 
 const BODY = '#263238';
@@ -21,7 +25,7 @@ const CASQUE = '#FF8A3D';
 const SCARF = '#58CC02';
 const SCARF_EDGE = '#46A302';
 
-export function Mascot({ mood = 'happy', className, label, idle = false }: Props) {
+export function Mascot({ mood = 'happy', className, label, idle = false, cover = 'none', look = 0 }: Props) {
   const decorative = !label;
   const beakOpen = mood === 'cheer' || mood === 'wow' || mood === 'wave';
   const wingUp = mood === 'cheer' || mood === 'wave';
@@ -103,8 +107,10 @@ export function Mascot({ mood = 'happy', className, label, idle = false }: Props
               </>
             ) : (
               <>
-                <circle className="bayu-pupil" cx="117" cy="64" r="6.5" fill={BODY} />
-                <circle cx="119.5" cy="61" r="2.3" fill="#FFFFFF" />
+                <g className="bayu-look" style={{ transform: `translateX(${look * 4}px)` }}>
+                  <circle className="bayu-pupil" cx="117" cy="64" r="6.5" fill={BODY} />
+                  <circle cx="119.5" cy="61" r="2.3" fill="#FFFFFF" />
+                </g>
               </>
             )}
             {mood === 'happy' || mood === 'cheer' || mood === 'wave' ? (
@@ -116,6 +122,11 @@ export function Mascot({ mood = 'happy', className, label, idle = false }: Props
           {mood === 'think' && <path d="M103 46l22-5" stroke="#FFC29A" strokeWidth="4" strokeLinecap="round" />}
           {mood === 'wow' && <path d="M102 44c7-8 19-8 25 0" stroke="#FFC29A" strokeWidth="4" fill="none" strokeLinecap="round" />}
           <ellipse cx="96" cy="85" rx="8.5" ry="5" fill="#FF8E8E" opacity="0.55" />
+          {/* wing that covers the eye while a password is typed */}
+          <g className="bayu-cover" style={{ transform: cover === 'full' ? 'translateY(0)' : cover === 'peek' ? 'translateY(13px)' : 'translateY(60px)', opacity: cover === 'none' ? 0 : 1 }}>
+            <path d="M92 74c-6-16 8-30 24-28 13 2 22 12 19 26-4 9-40 11-43 2z" fill={WING} />
+            <path d="M99 70c7 4 22 4 30 0" stroke={BODY} strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.55" />
+          </g>
         </g>
         {mood === 'cheer' && (
           <g fill={BEAK}>

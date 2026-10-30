@@ -75,9 +75,9 @@ export function ConfettiLayer() {
 }
 
 /** Counts from the previous value to the new one (ease-out, 700ms). Instant under reduced motion. */
-export function useCountUp(value: number, duration = 700): number {
-  const [shown, setShown] = useState(value);
-  const from = useRef(value);
+export function useCountUp(value: number, duration = 700, start0?: number): number {
+  const [shown, setShown] = useState(start0 ?? value);
+  const from = useRef(start0 ?? value);
   useEffect(() => {
     const start = from.current;
     if (start === value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {

@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 import { NavLink, Outlet, useLocation, ScrollRestoration, Link } from 'react-router';
-import { Home, Search, Puzzle, Bookmark, UserRound, Flame, CalendarCheck, Map, Layers, X, Sparkles } from 'lucide-react';
+import { Home, Search, Puzzle, Bookmark, UserRound, Flame, CalendarCheck, Map, Layers, X, Sparkles, Trophy } from 'lucide-react';
 import { useProgress, useStorageNotice, useStore } from './store';
+import { useAuth } from './auth';
 import { currentStreak } from '../lib/progress';
 import { dateKey } from '../lib/date';
 import { Wordmark } from '../components/Mascot';
@@ -18,10 +19,14 @@ const NAV = [
 ];
 
 const EXTRA = [
+  { to: '/papan-juara', label: 'Papan Juara', icon: Trophy },
   { to: '/laluan', label: 'Laluan', icon: Map },
   { to: '/harian', label: 'Peribahasa Hari Ini', icon: CalendarCheck },
   { to: '/kad-imbas', label: 'Kad Imbas', icon: Layers },
 ];
+
+/** Sign-in screens are full-page: no sidebar or tab bar competes with the form. */
+const AUTH_PATHS = ['/masuk', '/daftar', '/lupa-kata-laluan'];
 
 function useToday() {
   const today = dateKey();
@@ -54,10 +59,13 @@ function XpChip({ xp }: { xp: number }) {
 export function Layout() {
   const { pathname } = useLocation();
   const hasProfile = useProgress((s) => !!s.profile);
-  const notice = useStorageNotice();
+  const storageNotice = useStorageNotice();
   const store = useStore();
+  const auth = useAuth();
+  const notice = auth.notice ?? storageNotice;
+  const dismiss = auth.notice ? auth.clearNotice : store.dismissNotice;
   const { xpToday, goal, xpTotal, streak } = useToday();
-  const bare = pathname === '/' && !hasProfile;
+  const bare = (pathname === '/' && !hasProfile) || AUTH_PATHS.some((p) => pathname.startsWith(p));
   const focused = pathname.startsWith('/pelajaran/');
   const activeIndex = NAV.findIndex((n) => n.match(pathname));
   const active = Math.max(0, activeIndex);
@@ -65,8 +73,8 @@ export function Layout() {
   if (bare) {
     return (
       <>
-        {notice && <div className="fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)]"><StorageNotice notice={notice} onDismiss={store.dismissNotice} /></div>}
-        <Outlet />
+        {notice && <div className="fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)]"><StorageNotice notice={notice} onDismiss={dismiss} /></div>}
+        <Suspense fallback={<PageSkeleton />}><Outlet /></Suspense>
         <ProgressFeedback />
         <ConfettiLayer />
         <ScrollRestoration />
@@ -115,13 +123,14 @@ export function Layout() {
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b-2 border-line bg-paper px-4 pb-2.5 pt-[calc(10px+env(safe-area-inset-top))] lg:hidden">
             <Link to="/" className="no-underline" aria-label="LESTARI, laman utama"><Wordmark /></Link>
             <div className="flex items-center gap-2">
+              <Link to="/papan-juara" aria-label="Papan Juara" className="grid size-[34px] place-items-center rounded-full bg-lavender-soft text-lavender-ink no-underline"><Trophy className="size-[18px]" strokeWidth={2.6} aria-hidden /></Link>
               <StreakChip streak={streak} />
               <XpChip xp={xpTotal} />
             </div>
           </header>
         )}
 
-        <StorageNotice notice={notice} onDismiss={store.dismissNotice} />
+        <StorageNotice notice={notice} onDismiss={dismiss} />
 
         <main id="utama" className={`mx-auto w-full max-w-[1080px] px-4 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10 ${focused ? 'pb-10' : 'pb-[calc(110px+env(safe-area-inset-bottom))]'}`}>
           <Suspense fallback={<PageSkeleton />}>
